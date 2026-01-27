@@ -17,7 +17,7 @@ import {
   LayoutGrid,
   Trash2
 } from 'lucide-react';
-import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 interface Entry {
