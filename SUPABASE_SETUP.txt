@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS caisse_sophie (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  date DATE UNIQUE NOT NULL,
+  especes DECIMAL(10,2) DEFAULT 0,
+  cb DECIMAL(10,2) DEFAULT 0,
+  cheques DECIMAL(10,2) DEFAULT 0,
+  depenses DECIMAL(10,2) DEFAULT 0
+);
+
+ALTER TABLE caisse_sophie ENABLE ROW LEVEL SECURITY;
+
+-- Suppression de la politique si elle existe déjà (pour éviter les erreurs)
+DROP POLICY IF EXISTS "Acces total public" ON caisse_sophie;
+
+CREATE POLICY "Acces total public" 
+ON caisse_sophie 
+FOR ALL 
+TO anon 
+USING (true) 
+WITH CHECK (true);

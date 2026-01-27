@@ -15,12 +15,15 @@ import {
   X,
   Table as TableIcon,
   LayoutGrid,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { supabase } from '@/lib/supabase';
 
 interface Entry {
+  id?: string;
   date: string;
   especes: number;
   cb: number;
@@ -39,11 +42,27 @@ export default function SophieCaisse() {
     depenses: ''
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Simulation de chargement de données
+  // Charger les données depuis Supabase
+  const loadEntries = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('caisse_sophie')
+      .select('*')
+      .order('date', { ascending: true });
+    
+    if (error) {
+      console.error('Erreur chargement:', error);
+      alert("Erreur de connexion aux données !");
+    } else {
+      setEntries(data || []);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const saved = localStorage.getItem('sophie_entries');
-    if (saved) setEntries(JSON.parse(saved));
+    loadEntries();
   }, []);
 
   // Mettre à jour le formulaire quand la date change
@@ -63,9 +82,9 @@ export default function SophieCaisse() {
     }
   }, [selectedDate, entries]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const newEntry: Entry = {
+    const entryData = {
       date: dateStr,
       especes: parseFloat(formData.especes || '0'),
       cb: parseFloat(formData.cb || '0'),
@@ -73,21 +92,35 @@ export default function SophieCaisse() {
       depenses: parseFloat(formData.depenses || '0')
     };
 
-    const newEntries = [...entries.filter(e => e.date !== dateStr), newEntry];
-    setEntries(newEntries);
-    localStorage.setItem('sophie_entries', JSON.stringify(newEntries));
-    alert("Caisse enregistrée !");
+    // Upsert = Insérer ou Mettre à jour si la date existe déjà
+    const { error } = await supabase
+      .from('caisse_sophie')
+      .upsert(entryData, { onConflict: 'date' });
+
+    if (error) {
+      alert("Erreur lors de la sauvegarde : " + error.message);
+    } else {
+      await loadEntries(); // Recharger pour avoir les données fraîches
+      alert("Caisse enregistrée avec succès !");
+    }
   };
 
-  const handleDelete = (dateStr: string) => {
-    if (confirm("Voulez-vous vraiment supprimer cette entrée ?")) {
-      const newEntries = entries.filter(e => e.date !== dateStr);
-      setEntries(newEntries);
-      localStorage.setItem('sophie_entries', JSON.stringify(newEntries));
-      // Si on supprime la date en cours d'édition, on vide le formulaire
-      if (format(selectedDate, 'yyyy-MM-dd') === dateStr) {
-        setFormData({ especes: '', cb: '', cheques: '', depenses: '' });
-        setIsEditing(false);
+  const handleDelete = async (dateStr: string) => {
+    if (confirm("Voulez-vous vraiment supprimer cette entrée définitivement ?")) {
+      const { error } = await supabase
+        .from('caisse_sophie')
+        .delete()
+        .eq('date', dateStr);
+
+      if (error) {
+        alert("Erreur de suppression : " + error.message);
+      } else {
+        await loadEntries();
+        // Si on supprime la date en cours d'édition, on vide le formulaire
+        if (format(selectedDate, 'yyyy-MM-dd') === dateStr) {
+          setFormData({ especes: '', cb: '', cheques: '', depenses: '' });
+          setIsEditing(false);
+        }
       }
     }
   };
@@ -120,6 +153,17 @@ export default function SophieCaisse() {
   const totalMonthCheques = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr).reduce((acc, e) => acc + e.cheques, 0);
   const totalMonthDepenses = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr).reduce((acc, e) => acc + e.depenses, 0);
   const grandTotalMonth = totalMonthEspeces + totalMonthCB + totalMonthCheques + totalMonthDepenses;
+
+  if (loading && entries.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-indigo-600">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="animate-spin" size={40} />
+          <p className="font-bold">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 print:bg-white print:pb-0">
@@ -250,10 +294,10 @@ export default function SophieCaisse() {
             
             {/* Historique avec fonction suppression */}
             <div className="mt-8 px-2 text-slate-400 uppercase text-[10px] font-black tracking-widest mb-4">
-              Historique récent
+              Historique récent (Cloud)
             </div>
             <div className="space-y-3 pb-8">
-              {entries.slice(-3).reverse().map((entry, i) => (
+              {entries.slice(-5).reverse().map((entry, i) => (
                 <div key={i} className="bg-white/60 border border-white p-4 rounded-2xl flex justify-between items-center shadow-sm">
                   <div>
                     <div className="font-bold text-slate-700 capitalize">{format(new Date(entry.date), 'EEEE d MMMM', { locale: fr })}</div>
