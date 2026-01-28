@@ -16,7 +16,9 @@ import {
   Table as TableIcon,
   LayoutGrid,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  User
 } from 'lucide-react';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -32,6 +34,61 @@ interface Entry {
 }
 
 export default function SophieCaisse() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(""); // Pour savoir qui est connecté
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [loginError, setLoginError] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Vérification de l'authentification au démarrage
+  useEffect(() => {
+    const authUser = localStorage.getItem('sophie_user');
+    if (authUser) {
+      setIsAuthenticated(true);
+      setCurrentUser(authUser);
+    }
+    setCheckingAuth(false);
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Récupération des mots de passe depuis les variables d'environnement (ou valeurs par défaut)
+    const passSophie = process.env.NEXT_PUBLIC_PASS_SOPHIE || "admin2026";
+    const passCollab = process.env.NEXT_PUBLIC_PASS_COLLAB || "caisse2026";
+    
+    // Normalisation de l'identifiant (minuscules)
+    const user = usernameInput.toLowerCase().trim();
+    
+    let isValid = false;
+
+    // Vérification des identifiants
+    if (user === "sophie" && passwordInput === passSophie) {
+      isValid = true;
+    } else if ((user === "equipe" || user === "vendeuse") && passwordInput === passCollab) {
+      isValid = true;
+    }
+
+    if (isValid) {
+      setIsAuthenticated(true);
+      setCurrentUser(user);
+      localStorage.setItem('sophie_user', user); // On stocke le nom de l'utilisateur
+      setLoginError(false);
+    } else {
+      setLoginError(true);
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setCurrentUser("");
+    localStorage.removeItem('sophie_user');
+    setPasswordInput("");
+    setUsernameInput("");
+  };
+
+  // --- Code de l'application (inchangé) ---
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<Entry[]>([]);
   const [viewMode, setViewMode] = useState<'form' | 'table'>('form');
@@ -44,8 +101,8 @@ export default function SophieCaisse() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Charger les données depuis Supabase
   const loadEntries = async () => {
+    if (!isAuthenticated) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('caisse_sophie')
@@ -62,10 +119,11 @@ export default function SophieCaisse() {
   };
 
   useEffect(() => {
-    loadEntries();
-  }, []);
+    if (isAuthenticated) {
+      loadEntries();
+    }
+  }, [isAuthenticated]);
 
-  // Mettre à jour le formulaire quand la date change
   useEffect(() => {
     const existing = entries.find(e => e.date === format(selectedDate, 'yyyy-MM-dd'));
     if (existing) {
@@ -92,7 +150,6 @@ export default function SophieCaisse() {
       depenses: parseFloat(formData.depenses || '0')
     };
 
-    // Upsert = Insérer ou Mettre à jour si la date existe déjà
     const { error } = await supabase
       .from('caisse_sophie')
       .upsert(entryData, { onConflict: 'date' });
@@ -100,7 +157,7 @@ export default function SophieCaisse() {
     if (error) {
       alert("Erreur lors de la sauvegarde : " + error.message);
     } else {
-      await loadEntries(); // Recharger pour avoir les données fraîches
+      await loadEntries();
       alert("Caisse enregistrée avec succès !");
     }
   };
@@ -116,7 +173,6 @@ export default function SophieCaisse() {
         alert("Erreur de suppression : " + error.message);
       } else {
         await loadEntries();
-        // Si on supprime la date en cours d'édition, on vide le formulaire
         if (format(selectedDate, 'yyyy-MM-dd') === dateStr) {
           setFormData({ especes: '', cb: '', cheques: '', depenses: '' });
           setIsEditing(false);
@@ -134,7 +190,6 @@ export default function SophieCaisse() {
                    parseFloat(formData.cheques || '0') + 
                    parseFloat(formData.depenses || '0');
 
-  // Génération des données pour le tableau du mois
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -154,6 +209,73 @@ export default function SophieCaisse() {
   const totalMonthDepenses = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr).reduce((acc, e) => acc + e.depenses, 0);
   const grandTotalMonth = totalMonthEspeces + totalMonthCB + totalMonthCheques + totalMonthDepenses;
 
+  // --- RENDER : LOGIN SCREEN ---
+  if (checkingAuth) return null;
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center space-y-6">
+          <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-indigo-600">
+            <Lock size={32} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Identification</h1>
+            <p className="text-slate-500 text-sm mt-1">Accès sécurisé à la caisse</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="space-y-4 text-left">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase ml-1">Identifiant</label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 text-slate-400" size={20} />
+                <input
+                  type="text"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder="ex: sophie ou equipe"
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 rounded-xl pl-10 pr-4 py-3 outline-none transition-all"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase ml-1">Mot de passe</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 rounded-xl pl-10 pr-4 py-3 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {loginError && (
+              <p className="text-red-500 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">
+                Identifiant ou mot de passe incorrect
+              </p>
+            )}
+            
+            <button 
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all active:scale-95 mt-2"
+            >
+              Se connecter
+            </button>
+          </form>
+          <div className="text-xs text-slate-400 pt-4 border-t">
+            Besoin d'aide ? Contactez l'administrateur.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER : APP SCREEN ---
   if (loading && entries.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-indigo-600">
@@ -167,19 +289,34 @@ export default function SophieCaisse() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 print:bg-white print:pb-0">
-      {/* Header - Masqué à l'impression */}
+      {/* Header */}
       <header className="bg-indigo-600 text-white p-6 shadow-lg rounded-b-3xl print:hidden">
         <div className="flex justify-between items-center max-w-md mx-auto">
-          <h1 className="text-2xl font-bold tracking-tight">Caisse de Sophie</h1>
-          <button 
-            onClick={printTable}
-            className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition flex items-center gap-2 text-sm font-bold"
-          >
-            <Download size={20} /> PDF
-          </button>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Caisse de Sophie</h1>
+            <div className="text-xs text-indigo-200 flex items-center gap-1">
+              <User size={12} /> Connecté en tant que <span className="font-bold capitalize">{currentUser}</span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={printTable}
+              className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition flex items-center gap-2 text-sm font-bold"
+              title="Imprimer / PDF"
+            >
+              <Download size={20} />
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100"
+              title="Se déconnecter"
+            >
+              <Lock size={20} />
+            </button>
+          </div>
         </div>
         
-        {/* Navigation Mois / Sélecteur */}
+        {/* Navigation Mois / Sélecteur ... */}
         <div className="flex items-center justify-between mt-6 max-w-md mx-auto">
              <button onClick={() => setSelectedDate(subDays(selectedDate, viewMode === 'table' ? 30 : 1))} className="p-2 hover:bg-white/10 rounded-full transition">
                <ChevronLeft />
@@ -200,7 +337,7 @@ export default function SophieCaisse() {
              </button>
         </div>
 
-        {/* Toggle Vue */}
+        {/* Toggle Vue ... */}
         <div className="flex bg-indigo-800/50 p-1 rounded-xl mt-6 max-w-xs mx-auto backdrop-blur-sm">
           <button 
             onClick={() => setViewMode('form')}
@@ -217,7 +354,7 @@ export default function SophieCaisse() {
         </div>
       </header>
 
-      {/* Titre Impression (uniquement visible à l'impression) */}
+      {/* Reste de l'application (Tableaux, etc.) inchangé */}
       <div className="hidden print:block text-center mt-8 mb-8">
         <h1 className="text-2xl font-bold border-b-2 border-black pb-2 inline-block">
           FEUILLE DE REMISE DE CAISSE - {format(selectedDate, 'MMMM yyyy', { locale: fr }).toUpperCase()}
@@ -225,7 +362,6 @@ export default function SophieCaisse() {
       </div>
 
       <main className={`max-w-md mx-auto px-4 ${viewMode === 'table' ? 'max-w-4xl' : ''} -mt-4 print:mt-0 print:max-w-full print:px-0`}>
-        
         {viewMode === 'form' ? (
           <>
             {/* Card de Saisie */}
@@ -292,7 +428,6 @@ export default function SophieCaisse() {
               </button>
             </div>
             
-            {/* Historique avec fonction suppression */}
             <div className="mt-8 px-2 text-slate-400 uppercase text-[10px] font-black tracking-widest mb-4">
               Historique récent (Cloud)
             </div>
@@ -324,7 +459,7 @@ export default function SophieCaisse() {
             </div>
           </>
         ) : (
-          /* Vue Tableau style Comptable (Style Excel forcé) */
+          /* Vue Tableau style Excel */
           <div className="bg-white p-1 overflow-hidden print:shadow-none print:border-none">
             <table className="w-full border-collapse text-sm">
               <thead>
@@ -384,7 +519,7 @@ export default function SophieCaisse() {
                       </tr>
                     );
 
-                    // 2. Ligne Total Semaine (si Dimanche ou Fin de mois)
+                    // 2. Ligne Total Semaine
                     if (isSunday || isLastDay) {
                       const totalWeek = weekEsp + weekCb + weekChq + weekDep;
                       rows.push(
