@@ -25,7 +25,7 @@ export default function SophieCaisse() {
   const [session, setSession] = useState<any>(null);
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // État pour la visibilité du mot de passe
+  const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -56,9 +56,10 @@ export default function SophieCaisse() {
   const [newPassword, setNewPassword] = useState("");
   const [msgProfile, setMsgProfile] = useState("");
 
-  // --- DATALOADING & ACTIONS ---
+  // --- DATA LOADING ---
   const loadEntries = async () => {
     if (!session) return; setLoadingData(true);
+    // On charge TOUT l'historique pour être sûr d'avoir les données pour les exports annuels
     const { data, error } = await supabase.from('caisse_sophie').select('*').order('date', { ascending: true });
     if (error) console.error(error); else {
       setEntries((data || []).map((d: any) => ({ ...d, especes: parseFloat(d.especes)||0, cb: parseFloat(d.cb)||0, cheques: parseFloat(d.cheques)||0, depenses: parseFloat(d.depenses)||0 })));
@@ -90,9 +91,8 @@ export default function SophieCaisse() {
   const handleDelete = async (dateStr: string) => { if (!session || !confirm("Supprimer ?")) return; const { error } = await supabase.from('caisse_sophie').delete().eq('date', dateStr); if (error) alert("Erreur"); else await loadEntries(); };
   const clearField = (field: keyof typeof formData) => setFormData(prev => ({ ...prev, [field]: '' }));
 
-  // --- CALCULS GLOBAUX (Définis ici pour être dispos partout) ---
+  // --- CALCULS GLOBAUX ---
   const currentMonthStr = format(selectedDate, 'MM-yyyy');
-  // On filtre les entrées pour ne garder que celles du mois en cours
   const monthEntries = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr);
   
   const totalMonthEspeces = monthEntries.reduce((acc, e) => acc + e.especes, 0);
@@ -101,7 +101,7 @@ export default function SophieCaisse() {
   const totalMonthDepenses = monthEntries.reduce((acc, e) => acc + e.depenses, 0);
   
   const totalCA = totalMonthEspeces + totalMonthCB + totalMonthCheques;
-  const grandTotalNet = totalCA + totalMonthDepenses; // Total technique colonne
+  const grandTotalNet = totalCA + totalMonthDepenses;
   const avgDay = monthEntries.length > 0 ? totalCA / monthEntries.length : 0;
 
   const totalDay = parseFloat(formData.especes || '0') + parseFloat(formData.cb || '0') + parseFloat(formData.cheques || '0') + parseFloat(formData.depenses || '0');
@@ -113,61 +113,88 @@ export default function SophieCaisse() {
   const dataPie = [{ name: 'Espèces', value: totalMonthEspeces, color: '#16a34a' }, { name: 'CB', value: totalMonthCB, color: '#2563eb' }, { name: 'Chèques', value: totalMonthCheques, color: '#9333ea' }].filter(d => d.value > 0);
   const dataBar = daysInMonth.map(day => ({ day: format(day, 'dd'), CA: getDayData(day).especes + getDayData(day).cb + getDayData(day).cheques }));
 
-  // --- EXPORT ---
-  const handleExportCSV = () => {
-    // UTF-8 BOM pour Excel
-    let csvContent = "\uFEFFDate;Espèces;CB;Chèques;Dépenses;Total Jour\n";
-    
-    // On exporte uniquement le MOIS affiché (comme le tableau)
-    const exportData = monthEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    if (exportData.length === 0) {
-      alert("Aucune donnée à exporter pour ce mois.");
-      return;
-    }
-
-    exportData.forEach(e => {
-      const total = e.especes + e.cb + e.cheques + e.depenses;
-      csvContent += `${format(new Date(e.date), 'dd/MM/yyyy')};${e.especes.toString().replace('.',',')};${e.cb.toString().replace('.',',')};${e.cheques.toString().replace('.',',')};${e.depenses.toString().replace('.',',')};${total.toString().replace('.',',')}\n`;
-    });
-    
-    // Ligne Totaux
-    csvContent += `\nTOTAUX MOIS;${totalMonthEspeces.toString().replace('.',',')};${totalMonthCB.toString().replace('.',',')};${totalMonthCheques.toString().replace('.',',')};${totalMonthDepenses.toString().replace('.',',')};${grandTotalNet.toString().replace('.',',')}\n`;
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  // --- EXPORT FUNCTION ---
+  const downloadFile = (content: string, fileName: string, contentType: string) => {
+    const blob = new Blob([content], { type: contentType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Caisse_Sophie_${currentMonthStr}.csv`);
+    link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
     setShowExportMenu(false);
   };
 
-  const handleExportTXT = () => {
-    let txtContent = `JOURNAL DE CAISSE - SOPHIE\nMois : ${currentMonthStr}\n\n`;
+  const handleExportCSV = (period: 'month' | 'year') => {
+    let dataToExport = [];
+    let filename = "";
+
+    if (period === 'month') {
+      dataToExport = monthEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      filename = `Caisse_Sophie_${format(selectedDate, 'MM-yyyy')}.csv`;
+    } else {
+      // Export Année
+      const currentYear = format(selectedDate, 'yyyy');
+      dataToExport = entries
+        .filter(e => format(new Date(e.date), 'yyyy') === currentYear)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      filename = `Caisse_Sophie_ANNEE_${currentYear}.csv`;
+    }
+
+    if (dataToExport.length === 0) { alert("Aucune donnée pour cette période."); return; }
+
+    let csvContent = "\uFEFFDate;Espèces;CB;Chèques;Dépenses;Total Jour\n";
+    dataToExport.forEach(e => {
+      const total = e.especes + e.cb + e.cheques + e.depenses;
+      csvContent += `${format(new Date(e.date), 'dd/MM/yyyy')};${e.especes.toString().replace('.',',')};${e.cb.toString().replace('.',',')};${e.cheques.toString().replace('.',',')};${e.depenses.toString().replace('.',',')};${total.toString().replace('.',',')}\n`;
+    });
+
+    downloadFile(csvContent, filename, "text/csv;charset=utf-8;");
+  };
+
+  const handleExportTXT = (period: 'month' | 'year') => {
+    let dataToExport = [];
+    let title = "";
+    let filename = "";
+
+    if (period === 'month') {
+      dataToExport = monthEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      title = `Mois : ${format(selectedDate, 'MMMM yyyy', {locale:fr})}`;
+      filename = `Caisse_Sophie_${format(selectedDate, 'MM-yyyy')}.txt`;
+    } else {
+      const currentYear = format(selectedDate, 'yyyy');
+      dataToExport = entries.filter(e => format(new Date(e.date), 'yyyy') === currentYear).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      title = `ANNÉE COMPLÈTE : ${currentYear}`;
+      filename = `Caisse_Sophie_ANNEE_${currentYear}.txt`;
+    }
+
+    if (dataToExport.length === 0) { alert("Aucune donnée."); return; }
+
+    let txtContent = `JOURNAL DE CAISSE - SOPHIE\n${title}\n\n`;
     txtContent += "DATE       | ESPÈCES  | CB       | CHÈQUES  | DÉPENSES | TOTAL\n";
     txtContent += "-----------|----------|----------|----------|----------|---------\n";
     
-    const exportData = monthEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    exportData.forEach(e => {
+    let tEsp=0, tCb=0, tChq=0, tDep=0;
+
+    dataToExport.forEach(e => {
+      tEsp+=e.especes; tCb+=e.cb; tChq+=e.cheques; tDep+=e.depenses;
       const total = e.especes + e.cb + e.cheques + e.depenses;
-      const d = format(new Date(e.date), 'dd/MM/yyyy');
-      txtContent += `${d} | ${e.especes.toFixed(2).padStart(8)} | ${e.cb.toFixed(2).padStart(8)} | ${e.cheques.toFixed(2).padStart(8)} | ${e.depenses.toFixed(2).padStart(8)} | ${total.toFixed(2).padStart(7)}\n`;
+      txtContent += `${format(new Date(e.date), 'dd/MM/yyyy')} | ${e.especes.toFixed(2).padStart(8)} | ${e.cb.toFixed(2).padStart(8)} | ${e.cheques.toFixed(2).padStart(8)} | ${e.depenses.toFixed(2).padStart(8)} | ${total.toFixed(2).padStart(7)}\n`;
     });
     
     txtContent += "-----------|----------|----------|----------|----------|---------\n";
-    txtContent += `TOTAUX     | ${totalMonthEspeces.toFixed(2).padStart(8)} | ${totalMonthCB.toFixed(2).padStart(8)} | ${totalMonthCheques.toFixed(2).padStart(8)} | ${totalMonthDepenses.toFixed(2).padStart(8)} | ${grandTotalNet.toFixed(2).padStart(7)}\n`;
+    txtContent += `TOTAUX     | ${tEsp.toFixed(2).padStart(8)} | ${tCb.toFixed(2).padStart(8)} | ${tChq.toFixed(2).padStart(8)} | ${tDep.toFixed(2).padStart(8)} | ${(tEsp+tCb+tChq+tDep).toFixed(2).padStart(7)}\n`;
 
-    const blob = new Blob([txtContent], { type: "text/plain;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `Caisse_Sophie_${currentMonthStr}.txt`);
-    document.body.appendChild(link);
-    link.click();
-    setShowExportMenu(false);
+    downloadFile(txtContent, filename, "text/plain;charset=utf-8;");
+  };
+
+  const handlePrint = () => {
+    // Si on est en mode formulaire, on bascule en mode tableau pour l'impression par défaut
+    if (viewMode === 'form') setViewMode('table');
+    setTimeout(() => {
+      window.print();
+      setShowExportMenu(false);
+    }, 300); // Petit délai pour laisser le rendu se faire
   };
 
   if (checkingSession) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><RefreshCw className="animate-spin text-indigo-600" /></div>;
@@ -183,20 +210,8 @@ export default function SophieCaisse() {
             <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Mot de passe</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  value={passwordInput} 
-                  onChange={(e) => setPasswordInput(e.target.value)} 
-                  className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10 pr-10" 
-                  placeholder="••••••••" 
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-indigo-500"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+                <input type={showPassword ? "text" : "password"} value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10 pr-10" placeholder="••••••••" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-400 hover:text-indigo-500">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
               </div>
             </div>
             {loginError && <p className="text-red-500 text-xs font-bold text-center">{loginError}</p>}
@@ -209,6 +224,14 @@ export default function SophieCaisse() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 relative">
+      <style jsx global>{`
+        @media print {
+          @page { margin: 10mm; size: landscape; }
+          body { -webkit-print-color-adjust: exact; }
+          .print-scale-down { transform: scale(0.95); transform-origin: top center; }
+        }
+      `}</style>
+
       {/* MODAL PROFIL */}
       {showProfileModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -216,21 +239,8 @@ export default function SophieCaisse() {
             <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Mot de passe</h3><X className="cursor-pointer" onClick={() => setShowProfileModal(false)} /></div>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div className="relative">
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  value={newPassword} 
-                  onChange={(e) => setNewPassword(e.target.value)} 
-                  placeholder="Nouveau mot de passe" 
-                  className="w-full border-2 p-3 rounded-xl pr-10" 
-                  autoFocus 
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-indigo-500"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+                <input type={showPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe" className="w-full border-2 p-3 rounded-xl pr-10" autoFocus />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-400 hover:text-indigo-500">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
               </div>
               {msgProfile && <p className="text-xs text-center font-bold">{msgProfile}</p>}
               <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Valider</button>
@@ -246,12 +256,17 @@ export default function SophieCaisse() {
             <div className="relative">
               <button onClick={() => setShowExportMenu(!showExportMenu)} className={`bg-white/20 p-2 rounded-full transition hover:bg-white/30 ${showExportMenu ? 'bg-white/40 ring-2 ring-white' : ''}`}><Download size={20} /></button>
               {showExportMenu && (
-                <div className="absolute right-0 top-12 bg-white text-slate-800 rounded-xl shadow-2xl p-2 w-56 z-50 border border-slate-100">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase px-3 py-2">Exporter {format(selectedDate, 'MMMM yyyy', {locale:fr})}</div>
-                  <button onClick={handleExportCSV} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileSpreadsheet size={18} className="text-green-600" /> Excel (.csv)</button>
-                  <button onClick={handleExportTXT} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileText size={18} className="text-slate-600" /> Texte (.txt)</button>
-                  <div className="h-px bg-slate-100 my-1"></div>
-                  <button onClick={() => { window.print(); setShowExportMenu(false); }} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-bold text-indigo-600 text-sm"><Printer size={18} /> Imprimer PDF</button>
+                <div className="absolute right-0 top-12 bg-white text-slate-800 rounded-xl shadow-2xl p-3 w-64 z-50 border border-slate-100 animate-in fade-in zoom-in duration-200">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase px-3 pb-2">Exporter le Mois</div>
+                  <button onClick={() => handleExportCSV('month')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileSpreadsheet size={16} className="text-green-600" /> CSV ({format(selectedDate, 'MMM yyyy', {locale:fr})})</button>
+                  <button onClick={() => handleExportTXT('month')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileText size={16} className="text-slate-600" /> TXT ({format(selectedDate, 'MMM yyyy', {locale:fr})})</button>
+                  
+                  <div className="text-[10px] font-bold text-slate-400 uppercase px-3 pt-3 pb-2 border-t mt-2">Exporter l'Année</div>
+                  <button onClick={() => handleExportCSV('year')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileSpreadsheet size={16} className="text-green-700" /> CSV ({format(selectedDate, 'yyyy')})</button>
+                  <button onClick={() => handleExportTXT('year')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileText size={16} className="text-slate-700" /> TXT ({format(selectedDate, 'yyyy')})</button>
+                  
+                  <div className="h-px bg-slate-100 my-2"></div>
+                  <button onClick={handlePrint} className="w-full text-left px-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-3 font-bold text-sm justify-center shadow-md"><Printer size={18} /> Imprimer la page</button>
                 </div>
               )}
             </div>
@@ -288,9 +303,9 @@ export default function SophieCaisse() {
         </div>
       </header>
 
-      <div className="hidden print:block text-center mt-8 mb-8"><h1 className="text-2xl font-bold border-b-2 border-black pb-2 inline-block">BILAN DE CAISSE - {format(selectedDate, 'MMMM yyyy', { locale: fr }).toUpperCase()}</h1></div>
+      <div className="hidden print:block text-center mt-4 mb-4"><h1 className="text-xl font-bold border-b-2 border-black pb-2 inline-block">BILAN DE CAISSE - {format(selectedDate, 'MMMM yyyy', { locale: fr }).toUpperCase()}</h1></div>
 
-      <main className={`p-4 mx-auto ${viewMode === 'table' ? 'max-w-[98%] md:max-w-5xl' : 'max-w-md'} ${viewMode === 'stats' ? 'max-w-xl print:max-w-full print:w-full' : ''} -mt-4 print:mt-0`}>
+      <main className={`p-4 mx-auto print-scale-down ${viewMode === 'table' ? 'max-w-[98%] md:max-w-5xl' : 'max-w-md'} ${viewMode === 'stats' ? 'max-w-xl print:max-w-full print:w-full' : ''} -mt-4 print:mt-0`}>
         {loadingData ? <div className="text-center p-10"><RefreshCw className="animate-spin inline text-indigo-500" /></div> : 
          viewMode === 'form' ? (
           <div className="space-y-6">
