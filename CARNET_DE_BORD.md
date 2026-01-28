@@ -1,26 +1,17 @@
-# 📒 CARNET DE BORD & SUIVI PROJET
-
-**Projet :** Gestion de Caisse & Suivi Administratif (Template TPE/Artisans)
-**Date de création :** 27 Janvier 2026
-**Objectif :** Créer un outil SaaS simple, éthique et sécurisé pour la gestion quotidienne des petites entreprises.
-
----
-
-## 🛠️ JOURNAL DES INTERVENTIONS
-
-### 📅 Mardi 27 Janvier 2026 (Lancement & V1.2)
+### 📅 Mardi 27 Janvier 2026 (Lancement & V1.3)
 **État :** ✅ Mise en production
-**Résumé :** Transformation d'un script Python local en Web App sécurisée (SaaS) avec Bilan Statistique.
+**Résumé :** Finalisation de la Web App sécurisée (SaaS) avec Statistiques avancées et Exports.
 
 #### 1. Interface & UX (Frontend)
 - Initialisation projet **Next.js 15** + **Tailwind CSS**.
 - Création d'une **Vue "Saisie Rapide"** (Gros boutons, UX mobile) pour l'usage quotidien.
 - Création d'une **Vue "Tableur Comptable"** (Style Excel, Lignes hebdos, Totaux) pour rassurer et imprimer.
-- **NOUVEAU :** Ajout d'un onglet **"Bilan"** avec graphiques animés (Recharts).
-    - Indicateurs : Chiffre d'Affaires, Dépenses, Moyenne journalière.
-    - Graphiques : Répartition (Donut) et Évolution (Histogramme).
-- Ajout d'un **Mode Impression (PDF)** propre sans l'interface autour.
-- Système de modification/suppression de l'historique récent.
+- **Tableau de Bord (Bilan)** avec graphiques animés (Recharts) : Répartition et Évolution.
+- **Sélecteur de Date Natif :** Navigation rapide dans le calendrier (clic sur le mois).
+- **Menu Export Avancé :** 
+    - CSV (Excel) filtré par mois.
+    - TXT (Texte aligné) pour archivage simple.
+    - PDF (Impression optimisée) pour les stats et le tableau.
 
 #### 2. Données & Persistance (Backend)
 - Migration du stockage local (localStorage) vers **Supabase** (PostgreSQL).
@@ -31,7 +22,7 @@
 - Mise en place de **Supabase Auth** (Email/Password).
 - Création d'une **Whitelist (Liste d'invités)** via la table `sophie_autorisations`.
 - Sécurité **RLS (Row Level Security)** stricte : accès réservé aux emails autorisés.
-- **NOUVEAU :** Ajout d'une modale **"Profil"** permettant à l'utilisateur de changer son mot de passe en autonomie.
+- Ajout d'une modale **"Profil"** permettant à l'utilisateur de changer son mot de passe en autonomie.
 
 #### 4. Déploiement (DevOps)
 - Hébergement sur **Vercel** (HTTPS/SSL automatique).
@@ -44,32 +35,28 @@
 
 ### 🎯 Court Terme (Pour Sophie)
 - [x] **Tableau de Bord (Dashboard) :** Terminé (V1.2).
-- [ ] **Export Comptable :** Génération d'un fichier `.csv` ou `.xls` compatible avec le logiciel de son comptable.
-- [ ] **Gestion des Dépenses :** Photos des tickets de caisse.
-
+- [x] **Export Comptable :** Terminé (V1.3 - CSV/TXT).
+- [ ] **Gestion des Dépenses :** Photos des tickets de caisse (Stockage Supabase Storage).
+- [ ] **Mode Hors Ligne (PWA) :** Permettre la saisie même sans internet (Sync au retour).
 
 ### 🌍 Moyen Terme (Adaptation autres TPE/Artisans)
 *Idées pour dupliquer ce projet vers d'autres secteurs.*
 
 #### Pour un Boulanger / Snack :
-- [ ] **Module "Commandes" :** Saisir les commandes du lendemain (ex: 50 baguettes pour M. Maire).
-- [ ] **Anti-Gaspillage :** Saisie des invendus en fin de journée pour stats de pertes.
+- [ ] **Module "Commandes" :** Saisir les commandes du lendemain.
+- [ ] **Anti-Gaspillage :** Saisie des invendus.
 
 #### Pour un Coiffeur / Esthéticienne :
-- [ ] **Fichier Clients Simplifié :** Noter "Mme Michu : Couleur 5.4" (Conformité RGPD à prévoir).
-- [ ] **Rappel RDV :** Envoi automatique de SMS (via Twilio ou API WhatsApp).
+- [ ] **Fichier Clients Simplifié :** Historique des prestations.
+- [ ] **Rappel RDV :** SMS automatiques.
 
-#### Pour un Artisan BTP (Plombier/Électricien) :
-- [ ] **Suivi de Chantier :** Remplacer "Caisse" par "Heures passées" sur un chantier.
-- [ ] **Devis Rapide :** Générateur de devis PDF simple depuis le mobile.
-
-### 🤖 Idées "Intelligentes" (IA & Automation)
-- [ ] **Assistant Vocal :** "Dis Sophie, ajoute 50€ en espèces" (Via Web Speech API).
-- [ ] **Détection d'anomalies :** Alerte si le fond de caisse théorique ne correspond pas au réel.
+#### Pour un Artisan BTP :
+- [ ] **Suivi de Chantier :** Heures et matériel.
+- [ ] **Devis Rapide :** Générateur PDF sur mobile.
 
 ---
 
 ## 📝 NOTES TECHNIQUES & RAPPELS
-- **Base de données :** Supabase (Projet partagé, cloisonnement par Tables + RLS).
-- **Hébergement :** Vercel (Gratuit tant que usage personnel/TPE).
-- **Sécurité :** Toujours vérifier la table `_autorisations` avant d'ouvrir l'accès à un nouveau client.
+- **Base de données :** Supabase (Table `caisse_sophie` + `sophie_autorisations`).
+- **Sécurité :** Ne jamais donner d'accès sans ajouter l'email dans la table `sophie_autorisations`.
+- **Exports :** Le CSV utilise le séparateur point-virgule (;) et l'encodage UTF-8 BOM pour compatibilité Excel Windows.
