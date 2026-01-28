@@ -95,6 +95,33 @@ export default function SophieCaisse() {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  
+  // --- GESTION PROFIL / MOT DE PASSE ---
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [msgProfile, setMsgProfile] = useState("");
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setMsgProfile("Le mot de passe doit faire au moins 6 caractères.");
+      return;
+    }
+    setLoadingAuth(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    
+    if (error) {
+      setMsgProfile("Erreur: " + error.message);
+    } else {
+      setMsgProfile("Mot de passe modifié avec succès !");
+      setTimeout(() => {
+        setShowProfileModal(false);
+        setMsgProfile("");
+        setNewPassword("");
+      }, 1500);
+    }
+    setLoadingAuth(false);
+  };
 
   // Charger les données (seulement si session active)
   const loadEntries = async () => {
@@ -287,19 +314,64 @@ export default function SophieCaisse() {
   // Écran App (Si session active)
   return (
     <div className="min-h-screen bg-slate-50 pb-20 print:bg-white print:pb-0">
+      
+      {/* MODAL PROFIL */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+              <h3 className="text-lg font-bold text-slate-800">Changer le mot de passe</h3>
+              <button onClick={() => setShowProfileModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <p className="text-sm text-slate-600 mb-2">Entrez votre nouveau mot de passe pour <strong>{session.user.email}</strong>.</p>
+              
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Nouveau mot de passe"
+                className="w-full bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 outline-none"
+                autoFocus
+              />
+
+              {msgProfile && (
+                <p className={`text-xs font-bold p-2 rounded-lg text-center ${msgProfile.includes('succès') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {msgProfile}
+                </p>
+              )}
+              
+              <button 
+                type="submit"
+                disabled={loadingAuth}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl mt-2"
+              >
+                {loadingAuth ? 'Modification...' : 'Confirmer'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <header className="bg-indigo-600 text-white p-6 shadow-lg rounded-b-3xl print:hidden">
         <div className="flex justify-between items-center max-w-md mx-auto">
           <div>
             <h1 className="text-xl font-bold tracking-tight">Caisse de Sophie</h1>
-            <div className="text-xs text-indigo-200 flex items-center gap-1">
-              <User size={12} /> {session.user.email}
-            </div>
+            <button 
+              onClick={() => setShowProfileModal(true)}
+              className="text-xs text-indigo-200 flex items-center gap-1 hover:text-white hover:underline transition mt-1"
+            >
+              <User size={12} /> {session.user.email} (Profil)
+            </button>
           </div>
           <div className="flex gap-2">
             <button onClick={printTable} className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
               <Download size={20} />
             </button>
-            <button onClick={handleLogout} className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100">
+            <button onClick={handleLogout} className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100" title="Se déconnecter">
               <LogOut size={20} />
             </button>
           </div>

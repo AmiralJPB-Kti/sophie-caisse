@@ -1,25 +1,37 @@
----------------------------------------------------------
--- MISE A JOUR SECURITE (AUTHENTIFICATION REQUISE)
----------------------------------------------------------
+-- 1. Création de la liste des invités (Emails autorisés)
+CREATE TABLE IF NOT EXISTS sophie_autorisations (
+  email TEXT PRIMARY KEY
+);
 
-1. Allez dans l'interface Supabase -> SQL Editor -> New Query.
-2. Copiez-collez le bloc ci-dessous pour sécuriser la table :
+-- Active la sécurité sur cette liste
+ALTER TABLE sophie_autorisations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Lecture pour authentifiés" ON sophie_autorisations FOR SELECT TO authenticated USING (true);
 
-------------------- COPIER DEPUIS ICI -------------------
+-- 2. Création de la table de caisse
+CREATE TABLE IF NOT EXISTS caisse_sophie (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  date DATE UNIQUE NOT NULL,
+  especes DECIMAL(10,2) DEFAULT 0,
+  cb DECIMAL(10,2) DEFAULT 0,
+  cheques DECIMAL(10,2) DEFAULT 0,
+  depenses DECIMAL(10,2) DEFAULT 0
+);
+ALTER TABLE caisse_sophie ENABLE ROW LEVEL SECURITY;
 
--- 1. Supprimer l'ancienne politique "publique"
+-- 3. NETTOYAGE
 DROP POLICY IF EXISTS "Acces total public" ON caisse_sophie;
+DROP POLICY IF EXISTS "Acces aux utilisateurs connectes uniquement" ON caisse_sophie;
+DROP POLICY IF EXISTS "Acces Restreint par Liste" ON caisse_sophie;
 
--- 2. Créer une politique stricte : seuls les utilisateurs connectés peuvent lire/écrire
-CREATE POLICY "Acces aux utilisateurs connectes uniquement" 
+-- 4. RÈGLE D'OR : Filtrage par email
+CREATE POLICY "Acces Restreint par Liste" 
 ON caisse_sophie 
 FOR ALL 
 TO authenticated 
-USING (true) 
-WITH CHECK (true);
-
-------------------- FIN DU SCRIPT SQL -------------------
-
-3. Cliquez sur "Run".
-
-Désormais, impossible d'accéder aux données sans être connecté avec un compte utilisateur valide !
+USING (
+  EXISTS (SELECT 1 FROM sophie_autorisations WHERE email = auth.email())
+) 
+WITH CHECK (
+  EXISTS (SELECT 1 FROM sophie_autorisations WHERE email = auth.email())
+);
