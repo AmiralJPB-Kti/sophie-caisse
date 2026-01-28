@@ -11,6 +11,8 @@ import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval }
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Entry {
   id?: string;
@@ -56,10 +58,10 @@ export default function SophieCaisse() {
   const [newPassword, setNewPassword] = useState("");
   const [msgProfile, setMsgProfile] = useState("");
 
-  // --- DATALOADING ---
+  // --- DATA LOADING ---
   const loadEntries = async () => {
     if (!session) return; setLoadingData(true);
-    // On demande explictement 10000 lignes pour être sûr d'avoir tout l'historique
+    // FORCE LIMIT 10000 POUR AVOIR TOUT L'HISTORIQUE
     const { data, error } = await supabase.from('caisse_sophie').select('*').order('date', { ascending: true }).limit(10000);
     if (error) console.error(error); else {
       setEntries((data || []).map((d: any) => ({ ...d, especes: parseFloat(d.especes)||0, cb: parseFloat(d.cb)||0, cheques: parseFloat(d.cheques)||0, depenses: parseFloat(d.depenses)||0 })));
@@ -70,7 +72,7 @@ export default function SophieCaisse() {
 
   useEffect(() => {
     const existing = entries.find(e => e.date === format(selectedDate, 'yyyy-MM-dd'));
-    if (existing) { setFormData({ especes: existing.especes.toString(), cb: existing.cb.toString(), cheques: existing.cheques.toString(), depenses: existing.depenses.toString() }); setIsEditing(true); } 
+    if (existing) { setFormData({ especes: existing.especes.toString(), cb: existing.cb.toString(), cheques: existing.cheques.toString(), depenses: existing.depenses.toString() }); setIsEditing(true); }
     else { setFormData({ especes: '', cb: '', cheques: '', depenses: '' }); setIsEditing(false); }
   }, [selectedDate, entries]);
 
@@ -99,7 +101,6 @@ export default function SophieCaisse() {
   const totalMonthCB = monthEntries.reduce((acc, e) => acc + e.cb, 0);
   const totalMonthCheques = monthEntries.reduce((acc, e) => acc + e.cheques, 0);
   const totalMonthDepenses = monthEntries.reduce((acc, e) => acc + e.depenses, 0);
-  
   const totalCA = totalMonthEspeces + totalMonthCB + totalMonthCheques;
   const grandTotalNet = totalCA + totalMonthDepenses;
   const avgDay = monthEntries.length > 0 ? totalCA / monthEntries.length : 0;
@@ -113,7 +114,7 @@ export default function SophieCaisse() {
   const dataPie = [{ name: 'Espèces', value: totalMonthEspeces, color: '#16a34a' }, { name: 'CB', value: totalMonthCB, color: '#2563eb' }, { name: 'Chèques', value: totalMonthCheques, color: '#9333ea' }].filter(d => d.value > 0);
   const dataBar = daysInMonth.map(day => ({ day: format(day, 'dd'), CA: getDayData(day).especes + getDayData(day).cb + getDayData(day).cheques }));
 
-  // --- EXPORT FUNCTION ---
+  // --- EXPORT FUNCTIONS ---
   const downloadFile = (content: string, fileName: string, contentType: string) => {
     const blob = new Blob([content], { type: contentType });
     const url = URL.createObjectURL(blob);
@@ -133,7 +134,6 @@ export default function SophieCaisse() {
       dataToExport = monthEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       filename = `Caisse_Sophie_${format(selectedDate, 'MM-yyyy')}.csv`;
     } else {
-      // Export Année (Scan complet sur entries)
       const currentYear = format(selectedDate, 'yyyy');
       dataToExport = entries
         .filter(e => format(new Date(e.date), 'yyyy') === currentYear)
@@ -141,7 +141,7 @@ export default function SophieCaisse() {
       filename = `Caisse_Sophie_ANNEE_${currentYear}.csv`;
     }
 
-    if (dataToExport.length === 0) { alert("Aucune donnée trouvée pour cette période."); return; }
+    if (dataToExport.length === 0) { alert("Aucune donnée trouvée."); return; }
 
     let csvContent = "\uFEFFDate;Espèces;CB;Chèques;Dépenses;Total Jour\n";
     dataToExport.forEach(e => {
@@ -170,32 +170,96 @@ export default function SophieCaisse() {
       filename = `Caisse_Sophie_ANNEE_${currentYear}.txt`;
     }
 
-    if (dataToExport.length === 0) { alert("Aucune donnée trouvée."); return; }
+    if (dataToExport.length === 0) { alert("Aucune donnée."); return; }
 
     let txtContent = `JOURNAL DE CAISSE - SOPHIE\n${title}\n\n`;
     txtContent += "DATE       | ESPÈCES  | CB       | CHÈQUES  | DÉPENSES | TOTAL\n";
     txtContent += "-----------|----------|----------|----------|----------|---------\n";
-    
-    let tEsp=0, tCb=0, tChq=0, tDep=0;
-
     dataToExport.forEach(e => {
-      tEsp+=e.especes; tCb+=e.cb; tChq+=e.cheques; tDep+=e.depenses;
       const total = e.especes + e.cb + e.cheques + e.depenses;
       txtContent += `${format(new Date(e.date), 'dd/MM/yyyy')} | ${e.especes.toFixed(2).padStart(8)} | ${e.cb.toFixed(2).padStart(8)} | ${e.cheques.toFixed(2).padStart(8)} | ${e.depenses.toFixed(2).padStart(8)} | ${total.toFixed(2).padStart(7)}\n`;
     });
-    
-    txtContent += "-----------|----------|----------|----------|----------|---------\n";
-    txtContent += `TOTAUX     | ${tEsp.toFixed(2).padStart(8)} | ${tCb.toFixed(2).padStart(8)} | ${tChq.toFixed(2).padStart(8)} | ${tDep.toFixed(2).padStart(8)} | ${(tEsp+tCb+tChq+tDep).toFixed(2).padStart(7)}\n`;
-
     downloadFile(txtContent, filename, "text/plain;charset=utf-8;");
   };
 
+  // --- GENERATION PDF TABLEAU ---
+  const handleGeneratePDF = () => {
+    const doc = new jsPDF();
+    const title = `Bilan de Caisse - ${format(selectedDate, 'MMMM yyyy', { locale: fr }).toUpperCase()}`;
+    
+    // Titre
+    doc.setFontSize(16);
+    doc.text(title, 14, 20);
+    
+    // Préparation des données pour autotable
+    const tableRows = [];
+    let week = { e: 0, cb: 0, cq: 0, d: 0, n: 1 };
+
+    daysInMonth.forEach((day, index) => {
+      const d = getDayData(day);
+      const totalDay = d.especes + d.cb + d.cheques + d.depenses;
+      
+      // Cumuls hebdo
+      week.e += d.especes; week.cb += d.cb; week.cq += d.cheques; week.d += d.depenses;
+
+      tableRows.push([
+        format(day, 'EEE d', { locale: fr }),
+        d.especes ? d.especes.toFixed(2) : '',
+        d.cb ? d.cb.toFixed(2) : '',
+        d.cheques ? d.cheques.toFixed(2) : '',
+        d.depenses ? d.depenses.toFixed(2) : '',
+        totalDay ? totalDay.toFixed(2) : ''
+      ]);
+
+      // Ligne hebdo
+      if (day.getDay() === 0 || index === daysInMonth.length - 1) {
+        tableRows.push([
+          { content: `Total Semaine ${week.n}`, styles: { fontStyle: 'italic', fillColor: [240, 240, 240] } },
+          { content: week.e.toFixed(2), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+          { content: week.cb.toFixed(2), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+          { content: week.cq.toFixed(2), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+          { content: week.d.toFixed(2), styles: { fontStyle: 'bold', textColor: [200, 0, 0], fillColor: [240, 240, 240] } },
+          { content: (week.e + week.cb + week.cq + week.d).toFixed(2), styles: { fontStyle: 'bold', fillColor: [220, 220, 220] } },
+        ]);
+        week = { e: 0, cb: 0, cq: 0, d: 0, n: week.n + 1 };
+      }
+    });
+
+    // Ligne Totaux Finaux
+    tableRows.push([
+      { content: 'TOTAUX MOIS', styles: { fontStyle: 'bold', fillColor: [50, 50, 50], textColor: [255, 255, 255] } },
+      { content: totalMonthEspeces.toFixed(2), styles: { fontStyle: 'bold', fillColor: [50, 50, 50], textColor: [255, 255, 255] } },
+      { content: totalMonthCB.toFixed(2), styles: { fontStyle: 'bold', fillColor: [50, 50, 50], textColor: [255, 255, 255] } },
+      { content: totalMonthCheques.toFixed(2), styles: { fontStyle: 'bold', fillColor: [50, 50, 50], textColor: [255, 255, 255] } },
+      { content: totalMonthDepenses.toFixed(2), styles: { fontStyle: 'bold', fillColor: [50, 50, 50], textColor: [255, 255, 255] } },
+      { content: grandTotalNet.toFixed(2), styles: { fontStyle: 'bold', fillColor: [79, 70, 229], textColor: [255, 255, 255] } },
+    ]);
+
+    // Génération du tableau
+    autoTable(doc, {
+      head: [['Jour', 'Espèces', 'CB', 'Chèques', 'Dépenses', 'Total']],
+      body: tableRows,
+      startY: 30,
+      theme: 'grid',
+      headStyles: { fillColor: [79, 70, 229] }, // Indigo
+      styles: { fontSize: 9, cellPadding: 3 },
+      columnStyles: {
+        0: { cellWidth: 30 }, // Jour
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right', textColor: [200, 0, 0] }, // Dépenses rouges
+        5: { halign: 'right', fontStyle: 'bold' }
+      }
+    });
+
+    doc.save(`Bilan_Caisse_${format(selectedDate, 'MM-yyyy')}.pdf`);
+    setShowExportMenu(false);
+  };
+
   const handlePrint = () => {
-    if (viewMode === 'form') setViewMode('table');
-    setTimeout(() => {
-      window.print();
-      setShowExportMenu(false);
-    }, 300);
+    // Impression classique du navigateur (utile pour les Stats)
+    setTimeout(() => { window.print(); setShowExportMenu(false); }, 300);
   };
 
   if (checkingSession) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><RefreshCw className="animate-spin text-indigo-600" /></div>;
@@ -227,11 +291,10 @@ export default function SophieCaisse() {
     <div className="min-h-screen bg-slate-50 pb-20 relative">
       <style jsx global>{`
         @media print {
-          @page { margin: 5mm; size: portrait; }
+          @page { margin: 5mm; }
           body { -webkit-print-color-adjust: exact; background: white; }
           .print-scale-down { width: 100%; max-width: 100%; transform: scale(0.90); transform-origin: top center; }
           .print-hidden { display: none !important; }
-          /* Masquer les boutons d'export et logout à l'impression */
           button { display: none !important; }
         }
       `}</style>
@@ -263,14 +326,13 @@ export default function SophieCaisse() {
                 <div className="absolute right-0 top-12 bg-white text-slate-800 rounded-xl shadow-2xl p-3 w-64 z-50 border border-slate-100 animate-in fade-in zoom-in duration-200">
                   <div className="text-[10px] font-bold text-slate-400 uppercase px-3 pb-2">Exporter le Mois</div>
                   <button onClick={() => handleExportCSV('month')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileSpreadsheet size={16} className="text-green-600" /> CSV ({format(selectedDate, 'MMM yyyy', {locale:fr})})</button>
-                  <button onClick={() => handleExportTXT('month')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileText size={16} className="text-slate-600" /> TXT ({format(selectedDate, 'MMM yyyy', {locale:fr})})</button>
+                  <button onClick={handleGeneratePDF} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-bold text-indigo-600 text-sm"><Printer size={16} /> PDF Tableau (A4)</button>
                   
                   <div className="text-[10px] font-bold text-slate-400 uppercase px-3 pt-3 pb-2 border-t mt-2">Exporter l'Année</div>
                   <button onClick={() => handleExportCSV('year')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileSpreadsheet size={16} className="text-green-700" /> CSV ({format(selectedDate, 'yyyy')})</button>
-                  <button onClick={() => handleExportTXT('year')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileText size={16} className="text-slate-700" /> TXT ({format(selectedDate, 'yyyy')})</button>
                   
                   <div className="h-px bg-slate-100 my-2"></div>
-                  <button onClick={handlePrint} className="w-full text-left px-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-3 font-bold text-sm justify-center shadow-md"><Printer size={18} /> Imprimer PDF</button>
+                  <button onClick={handlePrint} className="w-full text-left px-3 py-3 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-3 font-medium text-sm justify-center"><Printer size={18} /> Imprimer Page Web</button>
                 </div>
               )}
             </div>
@@ -324,7 +386,7 @@ export default function SophieCaisse() {
                 <div key={f.id} className="relative">
                   <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">{f.label}</label>
                   <div className="relative">
-                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${f.color}`}><f.icon size={20} /></div>
+                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${f.color}`}>{<f.icon size={20} />}</div>
                     <input type="number" value={formData[f.id as keyof typeof formData]} onChange={(e) => setFormData({...formData, [f.id]: e.target.value})} onFocus={e => e.target.select()} className="w-full bg-slate-50 p-4 pl-12 rounded-2xl border-2 border-slate-100 outline-none focus:border-indigo-500 font-bold text-lg" placeholder="0.00" />
                     {formData[f.id as keyof typeof formData] && <X className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 cursor-pointer" onClick={() => clearField(f.id as keyof typeof formData)} />}
                   </div>
