@@ -172,15 +172,23 @@ export default function SophieCaisse() {
   const monthEnd = endOfMonth(selectedDate);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const getDayData = (date: Date) => entries.find(e => e.date === format(date, 'yyyy-MM-dd')) || { especes: 0, cb: 0, cheques: 0, depenses: 0 };
-  
+  const printTable = () => window.print();
+
+  // --- CALCULS TOTAUX MOIS (GLOBAL SCOPE pour accès partout) ---
   const currentMonthStr = format(selectedDate, 'MM-yyyy');
   const monthEntries = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr);
-  const totalMonthEsp = monthEntries.reduce((acc, e) => acc + e.especes, 0);
+  const totalMonthEspeces = monthEntries.reduce((acc, e) => acc + e.especes, 0);
   const totalMonthCB = monthEntries.reduce((acc, e) => acc + e.cb, 0);
-  const totalMonthChq = monthEntries.reduce((acc, e) => acc + e.cheques, 0);
-  const totalMonthDep = monthEntries.reduce((acc, e) => acc + e.depenses, 0);
-  const totalCA = totalMonthEsp + totalMonthCB + totalMonthChq;
-  const grandTotalNet = totalCA + totalMonthDep;
+  const totalMonthCheques = monthEntries.reduce((acc, e) => acc + e.cheques, 0);
+  const totalMonthDepenses = monthEntries.reduce((acc, e) => acc + e.depenses, 0);
+  const grandTotalMonth = totalMonthEspeces + totalMonthCB + totalMonthCheques + totalMonthDepenses;
+
+  // Totaux pour Stats
+  const totalMonthEsp = totalMonthEspeces;
+  const totalMonthChq = totalMonthCheques;
+  const totalMonthDep = totalMonthDepenses;
+  const totalCA = totalMonthEspeces + totalMonthCB + totalMonthCheques;
+  const grandTotalNet = totalCA + totalMonthDepenses;
   const avgDay = monthEntries.length > 0 ? totalCA / monthEntries.length : 0;
 
   // Graph data
@@ -367,7 +375,7 @@ export default function SophieCaisse() {
 
                   <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                     <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><PieChartIcon size={20} className="text-indigo-500"/> Répartition</h3>
-                    <div className="h-64 w-full">
+                    <div className="h-64 w-full" style={{ minHeight: '250px' }}>
                       {/* Fix: Explicit height on container to prevent Recharts -1 width error */}
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -383,7 +391,7 @@ export default function SophieCaisse() {
 
                   <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                     <h3 className="font-bold text-slate-800 mb-4">Évolution sur le mois</h3>
-                    <div className="h-64 w-full text-xs">
+                    <div className="h-64 w-full text-xs" style={{ minHeight: '250px' }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={dataBar}>
                           <XAxis dataKey="day" tickLine={false} axisLine={false} />
