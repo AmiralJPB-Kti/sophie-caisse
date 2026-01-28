@@ -411,8 +411,8 @@ export default function SophieCaisse() {
           </>
         ) : (
           /* VUE TABLEAU (Restaurée V1 - Bords noirs et Totaux Hebdo) */
-          <div className="bg-white p-1 overflow-hidden print:shadow-none print:border-none">
-            <table className="w-full border-collapse text-sm">
+          <div className="bg-white p-1 overflow-x-auto shadow-sm rounded-xl print:shadow-none print:border-none">
+            <table className="w-full border-collapse text-sm min-w-[600px]">
               <thead>
                 <tr className="bg-gray-100 print:bg-gray-200">
                   <th className="px-2 py-2 text-left font-bold text-black border border-slate-400 print:border-black w-32">Jour</th>
