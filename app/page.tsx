@@ -5,7 +5,7 @@ import {
   Calendar, Banknote, CreditCard, Receipt, ShoppingBag, Save, Edit2,
   ChevronLeft, ChevronRight, Download, X, Table as TableIcon, LayoutGrid,
   Trash2, RefreshCw, Lock, User, LogOut, Mail, PieChart as PieChartIcon,
-  FileSpreadsheet, FileText, Printer, File
+  FileSpreadsheet, FileText, Printer
 } from 'lucide-react';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -51,17 +51,11 @@ export default function SophieCaisse() {
   const [isEditing, setIsEditing] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false); // Menu export
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [msgProfile, setMsgProfile] = useState("");
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault(); if (newPassword.length < 6) { setMsgProfile("Mini 6 caractères."); return; }
-    setLoadingAuth(true); const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) setMsgProfile("Erreur: " + error.message); else { setMsgProfile("Succès !"); setTimeout(() => { setShowProfileModal(false); setMsgProfile(""); setNewPassword(""); }, 1500); }
-    setLoadingAuth(false);
-  };
-
+  // --- DATALOADING & ACTIONS ---
   const loadEntries = async () => {
     if (!session) return; setLoadingData(true);
     const { data, error } = await supabase.from('caisse_sophie').select('*').order('date', { ascending: true });
@@ -78,6 +72,13 @@ export default function SophieCaisse() {
     else { setFormData({ especes: '', cb: '', cheques: '', depenses: '' }); setIsEditing(false); }
   }, [selectedDate, entries]);
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault(); if (newPassword.length < 6) { setMsgProfile("Mini 6 caractères."); return; }
+    setLoadingAuth(true); const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) setMsgProfile("Erreur: " + error.message); else { setMsgProfile("Succès !"); setTimeout(() => { setShowProfileModal(false); setMsgProfile(""); setNewPassword(""); }, 1500); }
+    setLoadingAuth(false);
+  };
+
   const handleSave = async () => {
     if (!session) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -88,68 +89,85 @@ export default function SophieCaisse() {
   const handleDelete = async (dateStr: string) => { if (!session || !confirm("Supprimer ?")) return; const { error } = await supabase.from('caisse_sophie').delete().eq('date', dateStr); if (error) alert("Erreur"); else await loadEntries(); };
   const clearField = (field: keyof typeof formData) => setFormData(prev => ({ ...prev, [field]: '' }));
 
-  // --- EXPORT LOGIC ---
+  // --- CALCULS GLOBAUX (Définis ici pour être dispos partout) ---
+  const currentMonthStr = format(selectedDate, 'MM-yyyy');
+  // On filtre les entrées pour ne garder que celles du mois en cours
+  const monthEntries = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr);
+  
+  const totalMonthEspeces = monthEntries.reduce((acc, e) => acc + e.especes, 0);
+  const totalMonthCB = monthEntries.reduce((acc, e) => acc + e.cb, 0);
+  const totalMonthCheques = monthEntries.reduce((acc, e) => acc + e.cheques, 0);
+  const totalMonthDepenses = monthEntries.reduce((acc, e) => acc + e.depenses, 0);
+  
+  const totalCA = totalMonthEspeces + totalMonthCB + totalMonthCheques;
+  const grandTotalNet = totalCA + totalMonthDepenses; // Total technique colonne
+  const avgDay = monthEntries.length > 0 ? totalCA / monthEntries.length : 0;
+
+  const totalDay = parseFloat(formData.especes || '0') + parseFloat(formData.cb || '0') + parseFloat(formData.cheques || '0') + parseFloat(formData.depenses || '0');
+  const monthStart = startOfMonth(selectedDate);
+  const monthEnd = endOfMonth(selectedDate);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const getDayData = (date: Date) => entries.find(e => e.date === format(date, 'yyyy-MM-dd')) || { especes: 0, cb: 0, cheques: 0, depenses: 0 };
+
+  const dataPie = [{ name: 'Espèces', value: totalMonthEspeces, color: '#16a34a' }, { name: 'CB', value: totalMonthCB, color: '#2563eb' }, { name: 'Chèques', value: totalMonthCheques, color: '#9333ea' }].filter(d => d.value > 0);
+  const dataBar = daysInMonth.map(day => ({ day: format(day, 'dd'), CA: getDayData(day).especes + getDayData(day).cb + getDayData(day).cheques }));
+
+  // --- EXPORT ---
   const handleExportCSV = () => {
-    // CSV Header
-    let csvContent = "\uFEFFDate;Espèces;CB;Chèques;Dépenses;Total\n"; // UTF-8 BOM pour Excel
-    // Rows (All history or just current month? Let's do ALL history for backup purpose)
-    entries.forEach(e => {
+    // UTF-8 BOM pour Excel
+    let csvContent = "\uFEFFDate;Espèces;CB;Chèques;Dépenses;Total Jour\n";
+    
+    // On exporte uniquement le MOIS affiché (comme le tableau)
+    const exportData = monthEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    if (exportData.length === 0) {
+      alert("Aucune donnée à exporter pour ce mois.");
+      return;
+    }
+
+    exportData.forEach(e => {
       const total = e.especes + e.cb + e.cheques + e.depenses;
       csvContent += `${format(new Date(e.date), 'dd/MM/yyyy')};${e.especes.toString().replace('.',',')};${e.cb.toString().replace('.',',')};${e.cheques.toString().replace('.',',')};${e.depenses.toString().replace('.',',')};${total.toString().replace('.',',')}\n`;
     });
+    
+    // Ligne Totaux
+    csvContent += `\nTOTAUX MOIS;${totalMonthEspeces.toString().replace('.',',')};${totalMonthCB.toString().replace('.',',')};${totalMonthCheques.toString().replace('.',',')};${totalMonthDepenses.toString().replace('.',',')};${grandTotalNet.toString().replace('.',',')}\n`;
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `export_caisse_sophie_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.setAttribute("download", `Caisse_Sophie_${currentMonthStr}.csv`);
     document.body.appendChild(link);
     link.click();
     setShowExportMenu(false);
   };
 
   const handleExportTXT = () => {
-    let txtContent = `JOURNAL DE CAISSE - SOPHIE\nGénéré le ${format(new Date(), 'dd/MM/yyyy')}\n\n`;
-    txtContent += "DATE       | ESPÈCES | CB      | CHÈQUES | DÉPENSES | TOTAL\n";
-    txtContent += "-----------|---------|---------|---------|----------|---------\n";
-    entries.forEach(e => {
+    let txtContent = `JOURNAL DE CAISSE - SOPHIE\nMois : ${currentMonthStr}\n\n`;
+    txtContent += "DATE       | ESPÈCES  | CB       | CHÈQUES  | DÉPENSES | TOTAL\n";
+    txtContent += "-----------|----------|----------|----------|----------|---------\n";
+    
+    const exportData = monthEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    exportData.forEach(e => {
       const total = e.especes + e.cb + e.cheques + e.depenses;
       const d = format(new Date(e.date), 'dd/MM/yyyy');
-      txtContent += `${d} | ${e.especes.toFixed(2).padStart(7)} | ${e.cb.toFixed(2).padStart(7)} | ${e.cheques.toFixed(2).padStart(7)} | ${e.depenses.toFixed(2).padStart(8)} | ${total.toFixed(2).padStart(7)}\n`;
+      txtContent += `${d} | ${e.especes.toFixed(2).padStart(8)} | ${e.cb.toFixed(2).padStart(8)} | ${e.cheques.toFixed(2).padStart(8)} | ${e.depenses.toFixed(2).padStart(8)} | ${total.toFixed(2).padStart(7)}\n`;
     });
+    
+    txtContent += "-----------|----------|----------|----------|----------|---------\n";
+    txtContent += `TOTAUX     | ${totalMonthEspeces.toFixed(2).padStart(8)} | ${totalMonthCB.toFixed(2).padStart(8)} | ${totalMonthCheques.toFixed(2).padStart(8)} | ${totalMonthDepenses.toFixed(2).padStart(8)} | ${grandTotalNet.toFixed(2).padStart(7)}\n`;
+
     const blob = new Blob([txtContent], { type: "text/plain;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `export_caisse_sophie_${format(new Date(), 'yyyy-MM-dd')}.txt`);
+    link.setAttribute("download", `Caisse_Sophie_${currentMonthStr}.txt`);
     document.body.appendChild(link);
     link.click();
     setShowExportMenu(false);
   };
-
-  const handlePrint = () => {
-    window.print();
-    setShowExportMenu(false);
-  };
-
-  // --- CALCULS ---
-  const totalDay = parseFloat(formData.especes || '0') + parseFloat(formData.cb || '0') + parseFloat(formData.cheques || '0') + parseFloat(formData.depenses || '0');
-  const monthStart = startOfMonth(selectedDate);
-  const monthEnd = endOfMonth(selectedDate);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const getDayData = (date: Date) => entries.find(e => e.date === format(date, 'yyyy-MM-dd')) || { especes: 0, cb: 0, cheques: 0, depenses: 0 };
-  
-  const currentMonthStr = format(selectedDate, 'MM-yyyy');
-  const monthEntries = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr);
-  const totalMonthEsp = monthEntries.reduce((acc, e) => acc + e.especes, 0);
-  const totalMonthCB = monthEntries.reduce((acc, e) => acc + e.cb, 0);
-  const totalMonthChq = monthEntries.reduce((acc, e) => acc + e.cheques, 0);
-  const totalMonthDep = monthEntries.reduce((acc, e) => acc + e.depenses, 0);
-  const totalCA = totalMonthEsp + totalMonthCB + totalMonthChq;
-  const grandTotalNet = totalCA + totalMonthDep;
-  const avgDay = monthEntries.length > 0 ? totalCA / monthEntries.length : 0;
-
-  const dataPie = [{ name: 'Espèces', value: totalMonthEsp, color: '#16a34a' }, { name: 'CB', value: totalMonthCB, color: '#2563eb' }, { name: 'Chèques', value: totalMonthChq, color: '#9333ea' }].filter(d => d.value > 0);
-  const dataBar = daysInMonth.map(day => ({ day: format(day, 'dd'), CA: getDayData(day).especes + getDayData(day).cb + getDayData(day).cheques }));
 
   if (checkingSession) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><RefreshCw className="animate-spin text-indigo-600" /></div>;
 
@@ -163,7 +181,7 @@ export default function SophieCaisse() {
             <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Email</label><div className="relative"><Mail className="absolute left-3 top-3 text-slate-400" size={20} /><input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10" placeholder="sophie@exemple.com" /></div></div>
             <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Mot de passe</label><div className="relative"><Lock className="absolute left-3 top-3 text-slate-400" size={20} /><input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10" placeholder="••••••••" /></div></div>
             {loginError && <p className="text-red-500 text-xs font-bold text-center">{loginError}</p>}
-            <button type="submit" disabled={loadingAuth} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">{loadingAuth ? '...' : 'Se connecter'}</button>
+            <button type="submit" disabled={loadingAuth} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl transition-all active:scale-95">{loadingAuth ? 'Connexion...' : 'Se connecter'}</button>
           </form>
         </div>
       </div>
@@ -188,46 +206,25 @@ export default function SophieCaisse() {
 
       <header className="bg-indigo-600 text-white p-6 rounded-b-3xl print:hidden shadow-lg">
         <div className="max-w-md mx-auto flex justify-between items-center relative">
-          <div>
-            <h1 className="font-bold text-xl">Caisse de Sophie</h1>
-            <button onClick={() => setShowProfileModal(true)} className="text-xs opacity-80 flex items-center gap-1 hover:underline"><User size={12} /> {session.user.email}</button>
-          </div>
+          <div><h1 className="font-bold text-xl">Caisse de Sophie</h1><button onClick={() => setShowProfileModal(true)} className="text-xs opacity-80 flex items-center gap-1 hover:underline"><User size={12} /> {session.user.email}</button></div>
           <div className="flex gap-3 relative">
-            
-            {/* BOUTON EXPORT / DOWNLOAD */}
             <div className="relative">
-              <button 
-                onClick={() => setShowExportMenu(!showExportMenu)} 
-                className={`bg-white/20 p-2 rounded-full transition hover:bg-white/30 ${showExportMenu ? 'bg-white/40 ring-2 ring-white' : ''}`}
-                title="Exporter / Imprimer"
-              >
-                <Download size={20} />
-              </button>
-
-              {/* MENU DÉROULANT EXPORT */}
+              <button onClick={() => setShowExportMenu(!showExportMenu)} className={`bg-white/20 p-2 rounded-full transition hover:bg-white/30 ${showExportMenu ? 'bg-white/40 ring-2 ring-white' : ''}`}><Download size={20} /></button>
               {showExportMenu && (
-                <div className="absolute right-0 top-12 bg-white text-slate-800 rounded-xl shadow-2xl p-2 w-56 z-50 animate-in fade-in zoom-in duration-200 border border-slate-100">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase px-3 py-2">Exporter les données</div>
-                  <button onClick={handleExportCSV} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium transition text-sm">
-                    <FileSpreadsheet size={18} className="text-green-600" /> Excel (.csv)
-                  </button>
-                  <button onClick={handleExportTXT} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium transition text-sm">
-                    <FileText size={18} className="text-slate-600" /> Texte (.txt)
-                  </button>
+                <div className="absolute right-0 top-12 bg-white text-slate-800 rounded-xl shadow-2xl p-2 w-56 z-50 border border-slate-100">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase px-3 py-2">Exporter {format(selectedDate, 'MMMM yyyy', {locale:fr})}</div>
+                  <button onClick={handleExportCSV} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileSpreadsheet size={18} className="text-green-600" /> Excel (.csv)</button>
+                  <button onClick={handleExportTXT} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileText size={18} className="text-slate-600" /> Texte (.txt)</button>
                   <div className="h-px bg-slate-100 my-1"></div>
-                  <button onClick={handlePrint} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-bold text-indigo-600 transition text-sm">
-                    <Printer size={18} /> Imprimer en PDF
-                  </button>
+                  <button onClick={() => { window.print(); setShowExportMenu(false); }} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-bold text-indigo-600 text-sm"><Printer size={18} /> Imprimer PDF</button>
                 </div>
               )}
             </div>
-
             <button onClick={handleLogout} className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100"><LogOut size={20} /></button>
           </div>
         </div>
 
-        {/* Navigation Date (avec Calendrier Natif) */}
-        <div className={`max-w-md mx-auto flex justify-between items-center mt-6 ${viewMode === 'form' ? 'hidden' : ''}`}> 
+        <div className={`max-w-md mx-auto flex justify-between items-center mt-6 ${viewMode === 'form' ? 'hidden' : ''}`}>
           <button onClick={() => setSelectedDate(subDays(selectedDate, 30))}><ChevronLeft /></button>
           <div className="text-center relative group cursor-pointer">
             <div className="text-xs uppercase opacity-70 font-bold group-hover:opacity-100 transition">Mois de</div>
@@ -275,7 +272,7 @@ export default function SophieCaisse() {
                   <div className="relative">
                     <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${f.color}`}>{<f.icon size={20} />}</div>
                     <input type="number" value={formData[f.id as keyof typeof formData]} onChange={(e) => setFormData({...formData, [f.id]: e.target.value})} onFocus={e => e.target.select()} className="w-full bg-slate-50 p-4 pl-12 rounded-2xl border-2 border-slate-100 outline-none focus:border-indigo-500 font-bold text-lg" placeholder="0.00" />
-                    {formData[f.id as keyof typeof formData] && <X className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 cursor-pointer" onClick={() => clearField(f.id as keyof typeof formData)} />}
+                    {formData[f.id as keyof typeof formData] && <X className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 cursor-pointer" onClick={() => clearField(f.id as keyof typeof formData)} />} 
                   </div>
                 </div>
               ))}
@@ -297,13 +294,11 @@ export default function SophieCaisse() {
           <div className="space-y-6 pb-10 print:space-y-4 print:grid print:grid-cols-2 print:gap-4 print:pb-0">
             {monthEntries.length === 0 ? <div className="bg-white p-12 rounded-3xl text-center font-bold text-slate-400 border-2 border-dashed">Aucune donnée pour ce mois</div> : (
               <>
-                {/* BLOC KPIS - Optimisé Print pour être sur une ligne */}
                 <div className="print:col-span-2 flex flex-col md:flex-row print:flex-row gap-4">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex-1"><div className="text-xs font-bold text-slate-400 uppercase mb-1 tracking-widest">Chiffre d'Affaires</div><div className="text-5xl font-black text-slate-800">{totalCA.toFixed(2)} €</div></div>
                     <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dépenses</div><div className="text-2xl font-black text-red-500">{totalMonthDepenses.toFixed(2)} €</div></div>
                     <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Moy/Jour</div><div className="text-2xl font-black text-indigo-600">{avgDay.toFixed(0)} €</div></div>
                 </div>
-
                 <div className="bg-white p-6 rounded-3xl shadow-sm h-72 border border-slate-100 print:h-64 print:col-span-1 print:border-black" style={{ minHeight: '300px' }}>
                    <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2"><PieChartIcon size={18} className="text-indigo-500"/> Répartition des encaissements</h3>
                    <ResponsiveContainer width="100%" height="90%"><PieChart><Pie data={dataPie} innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value" stroke="none">{dataPie.map((entry, index) => (<Cell key={index} fill={entry.color} />))}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
