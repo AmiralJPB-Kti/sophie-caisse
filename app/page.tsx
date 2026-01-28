@@ -18,7 +18,9 @@ import {
   Trash2,
   RefreshCw,
   Lock,
-  User
+  User,
+  LogOut,
+  Mail
 } from 'lucide-react';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -34,61 +36,54 @@ interface Entry {
 }
 
 export default function SophieCaisse() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState(""); // Pour savoir qui est connecté
-  const [usernameInput, setUsernameInput] = useState("");
+  const [session, setSession] = useState<any>(null);
+  const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
-  const [loginError, setLoginError] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [loginError, setLoginError] = useState("");
+  const [loadingAuth, setLoadingAuth] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  // Vérification de l'authentification au démarrage
+  // --- GESTION AUTHENTIFICATION SUPABASE ---
+
   useEffect(() => {
-    const authUser = localStorage.getItem('sophie_user');
-    if (authUser) {
-      setIsAuthenticated(true);
-      setCurrentUser(authUser);
-    }
-    setCheckingAuth(false);
+    // Vérifier si une session existe déjà au chargement
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setCheckingSession(false);
+    });
+
+    // Écouter les changements d'état (connexion/déconnexion)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Récupération des mots de passe depuis les variables d'environnement (ou valeurs par défaut)
-    const passSophie = process.env.NEXT_PUBLIC_PASS_SOPHIE || "admin2026";
-    const passCollab = process.env.NEXT_PUBLIC_PASS_COLLAB || "caisse2026";
-    
-    // Normalisation de l'identifiant (minuscules)
-    const user = usernameInput.toLowerCase().trim();
-    
-    let isValid = false;
+    setLoadingAuth(true);
+    setLoginError("");
 
-    // Vérification des identifiants
-    if (user === "sophie" && passwordInput === passSophie) {
-      isValid = true;
-    } else if ((user === "equipe" || user === "vendeuse") && passwordInput === passCollab) {
-      isValid = true;
-    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailInput,
+      password: passwordInput,
+    });
 
-    if (isValid) {
-      setIsAuthenticated(true);
-      setCurrentUser(user);
-      localStorage.setItem('sophie_user', user); // On stocke le nom de l'utilisateur
-      setLoginError(false);
-    } else {
-      setLoginError(true);
+    if (error) {
+      setLoginError("Email ou mot de passe incorrect.");
     }
+    setLoadingAuth(false);
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setCurrentUser("");
-    localStorage.removeItem('sophie_user');
-    setPasswordInput("");
-    setUsernameInput("");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    // Le state 'session' sera mis à jour automatiquement via onAuthStateChange
   };
 
-  // --- Code de l'application (inchangé) ---
+  // --- APP LOGIC (Reste inchangé) ---
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<Entry[]>([]);
   const [viewMode, setViewMode] = useState<'form' | 'table'>('form');
@@ -99,11 +94,13 @@ export default function SophieCaisse() {
     depenses: ''
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(false);
 
+  // Charger les données (seulement si session active)
   const loadEntries = async () => {
-    if (!isAuthenticated) return;
-    setLoading(true);
+    if (!session) return;
+    
+    setLoadingData(true);
     const { data, error } = await supabase
       .from('caisse_sophie')
       .select('*')
@@ -115,15 +112,16 @@ export default function SophieCaisse() {
     } else {
       setEntries(data || []);
     }
-    setLoading(false);
+    setLoadingData(false);
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (session) {
       loadEntries();
     }
-  }, [isAuthenticated]);
+  }, [session]);
 
+  // Sync formulaire avec date
   useEffect(() => {
     const existing = entries.find(e => e.date === format(selectedDate, 'yyyy-MM-dd'));
     if (existing) {
@@ -141,6 +139,7 @@ export default function SophieCaisse() {
   }, [selectedDate, entries]);
 
   const handleSave = async () => {
+    if (!session) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const entryData = {
       date: dateStr,
@@ -155,22 +154,23 @@ export default function SophieCaisse() {
       .upsert(entryData, { onConflict: 'date' });
 
     if (error) {
-      alert("Erreur lors de la sauvegarde : " + error.message);
+      alert("Erreur : " + error.message);
     } else {
       await loadEntries();
-      alert("Caisse enregistrée avec succès !");
+      alert("Enregistré !");
     }
   };
 
   const handleDelete = async (dateStr: string) => {
-    if (confirm("Voulez-vous vraiment supprimer cette entrée définitivement ?")) {
+    if (!session) return;
+    if (confirm("Supprimer cette entrée ?")) {
       const { error } = await supabase
         .from('caisse_sophie')
         .delete()
         .eq('date', dateStr);
 
       if (error) {
-        alert("Erreur de suppression : " + error.message);
+        alert("Erreur : " + error.message);
       } else {
         await loadEntries();
         if (format(selectedDate, 'yyyy-MM-dd') === dateStr) {
@@ -209,10 +209,18 @@ export default function SophieCaisse() {
   const totalMonthDepenses = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr).reduce((acc, e) => acc + e.depenses, 0);
   const grandTotalMonth = totalMonthEspeces + totalMonthCB + totalMonthCheques + totalMonthDepenses;
 
-  // --- RENDER : LOGIN SCREEN ---
-  if (checkingAuth) return null;
+  // --- RENDER ---
 
-  if (!isAuthenticated) {
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-indigo-600">
+        <RefreshCw className="animate-spin" size={40} />
+      </div>
+    );
+  }
+
+  // Écran de Login (Si pas de session)
+  if (!session) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center space-y-6">
@@ -220,20 +228,20 @@ export default function SophieCaisse() {
             <Lock size={32} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Identification</h1>
-            <p className="text-slate-500 text-sm mt-1">Accès sécurisé à la caisse</p>
+            <h1 className="text-2xl font-bold text-slate-800">Caisse de Sophie</h1>
+            <p className="text-slate-500 text-sm mt-1">Connexion Sécurisée</p>
           </div>
           
           <form onSubmit={handleLogin} className="space-y-4 text-left">
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase ml-1">Identifiant</label>
+              <label className="text-xs font-bold text-slate-500 uppercase ml-1">Email</label>
               <div className="relative">
-                <User className="absolute left-3 top-3 text-slate-400" size={20} />
+                <Mail className="absolute left-3 top-3 text-slate-400" size={20} />
                 <input
-                  type="text"
-                  value={usernameInput}
-                  onChange={(e) => setUsernameInput(e.target.value)}
-                  placeholder="ex: sophie ou equipe"
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="sophie@exemple.com"
                   className="w-full bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 rounded-xl pl-10 pr-4 py-3 outline-none transition-all"
                   autoFocus
                 />
@@ -256,62 +264,43 @@ export default function SophieCaisse() {
 
             {loginError && (
               <p className="text-red-500 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">
-                Identifiant ou mot de passe incorrect
+                {loginError}
               </p>
             )}
             
             <button 
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all active:scale-95 mt-2"
+              disabled={loadingAuth}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all active:scale-95 mt-2 disabled:opacity-50"
             >
-              Se connecter
+              {loadingAuth ? 'Connexion...' : 'Se connecter'}
             </button>
           </form>
           <div className="text-xs text-slate-400 pt-4 border-t">
-            Besoin d'aide ? Contactez l'administrateur.
+            Application sécurisée v1.2
           </div>
         </div>
       </div>
     );
   }
 
-  // --- RENDER : APP SCREEN ---
-  if (loading && entries.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-indigo-600">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="animate-spin" size={40} />
-          <p className="font-bold">Chargement des données...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Écran App (Si session active)
   return (
     <div className="min-h-screen bg-slate-50 pb-20 print:bg-white print:pb-0">
-      {/* Header */}
       <header className="bg-indigo-600 text-white p-6 shadow-lg rounded-b-3xl print:hidden">
         <div className="flex justify-between items-center max-w-md mx-auto">
           <div>
             <h1 className="text-xl font-bold tracking-tight">Caisse de Sophie</h1>
             <div className="text-xs text-indigo-200 flex items-center gap-1">
-              <User size={12} /> Connecté en tant que <span className="font-bold capitalize">{currentUser}</span>
+              <User size={12} /> {session.user.email}
             </div>
           </div>
           <div className="flex gap-2">
-            <button 
-              onClick={printTable}
-              className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition flex items-center gap-2 text-sm font-bold"
-              title="Imprimer / PDF"
-            >
+            <button onClick={printTable} className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
               <Download size={20} />
             </button>
-            <button 
-              onClick={handleLogout}
-              className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100"
-              title="Se déconnecter"
-            >
-              <Lock size={20} />
+            <button onClick={handleLogout} className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100">
+              <LogOut size={20} />
             </button>
           </div>
         </div>
@@ -354,7 +343,6 @@ export default function SophieCaisse() {
         </div>
       </header>
 
-      {/* Reste de l'application (Tableaux, etc.) inchangé */}
       <div className="hidden print:block text-center mt-8 mb-8">
         <h1 className="text-2xl font-bold border-b-2 border-black pb-2 inline-block">
           FEUILLE DE REMISE DE CAISSE - {format(selectedDate, 'MMMM yyyy', { locale: fr }).toUpperCase()}
@@ -362,9 +350,10 @@ export default function SophieCaisse() {
       </div>
 
       <main className={`max-w-md mx-auto px-4 ${viewMode === 'table' ? 'max-w-4xl' : ''} -mt-4 print:mt-0 print:max-w-full print:px-0`}>
-        {viewMode === 'form' ? (
+        {loadingData ? (
+          <div className="flex justify-center p-10"><RefreshCw className="animate-spin text-indigo-500" /></div>
+        ) : viewMode === 'form' ? (
           <>
-            {/* Card de Saisie */}
             <div className="bg-white rounded-3xl shadow-xl p-6 space-y-6 border border-slate-100">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
@@ -429,7 +418,7 @@ export default function SophieCaisse() {
             </div>
             
             <div className="mt-8 px-2 text-slate-400 uppercase text-[10px] font-black tracking-widest mb-4">
-              Historique récent (Cloud)
+              Historique récent
             </div>
             <div className="space-y-3 pb-8">
               {entries.slice(-5).reverse().map((entry, i) => (
@@ -459,7 +448,7 @@ export default function SophieCaisse() {
             </div>
           </>
         ) : (
-          /* Vue Tableau style Excel */
+          /* Vue Tableau ... (identique, abrégée pour le remplacement) */
           <div className="bg-white p-1 overflow-hidden print:shadow-none print:border-none">
             <table className="w-full border-collapse text-sm">
               <thead>
@@ -482,77 +471,35 @@ export default function SophieCaisse() {
 
                   return daysInMonth.map((day, index) => {
                     const data = getDayData(day);
-                    
-                    // Cumul semaine
-                    weekEsp += data.especes;
-                    weekCb += data.cb;
-                    weekChq += data.cheques;
-                    weekDep += data.depenses;
-
+                    weekEsp += data.especes; weekCb += data.cb; weekChq += data.cheques; weekDep += data.depenses;
                     const totalDay = data.especes + data.cb + data.cheques + data.depenses;
                     const isSunday = day.getDay() === 0;
                     const isLastDay = index === daysInMonth.length - 1;
-                    
                     const rows = [];
-
-                    // 1. Ligne du jour
                     rows.push(
                       <tr key={day.toString()} className={`${isSunday ? 'bg-slate-50 print:bg-slate-50' : ''}`}>
-                        <td className="px-2 py-1 font-medium text-black border border-slate-400 print:border-black capitalize">
-                          {format(day, 'EEE d', { locale: fr })}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">
-                          {data.especes !== 0 ? data.especes.toFixed(2) : ''}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">
-                          {data.cb !== 0 ? data.cb.toFixed(2) : ''}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">
-                          {data.cheques !== 0 ? data.cheques.toFixed(2) : ''}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black text-black">
-                          {data.depenses !== 0 ? data.depenses.toFixed(2) : ''}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono font-bold text-black bg-gray-50 border border-slate-400 print:border-black">
-                          {totalDay !== 0 ? totalDay.toFixed(2) : ''}
-                        </td>
+                        <td className="px-2 py-1 font-medium text-black border border-slate-400 print:border-black capitalize">{format(day, 'EEE d', { locale: fr })}</td>
+                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">{data.especes !== 0 ? data.especes.toFixed(2) : ''}</td>
+                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">{data.cb !== 0 ? data.cb.toFixed(2) : ''}</td>
+                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">{data.cheques !== 0 ? data.cheques.toFixed(2) : ''}</td>
+                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black text-black">{data.depenses !== 0 ? data.depenses.toFixed(2) : ''}</td>
+                        <td className="px-2 py-1 text-right font-mono font-bold text-black bg-gray-50 border border-slate-400 print:border-black">{totalDay !== 0 ? totalDay.toFixed(2) : ''}</td>
                       </tr>
                     );
-
-                    // 2. Ligne Total Semaine
                     if (isSunday || isLastDay) {
                       const totalWeek = weekEsp + weekCb + weekChq + weekDep;
                       rows.push(
                         <tr key={`week-${weekNum}`} className="bg-gray-300 print:bg-gray-300 font-bold border-t-2 border-black">
-                          <td className="px-2 py-1 text-left border border-black print:border-black italic">
-                            Total Semaine {weekNum}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black">
-                            {weekEsp.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black">
-                            {weekCb.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black">
-                            {weekChq.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black text-red-900">
-                            {weekDep.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black bg-gray-400 print:bg-gray-400">
-                            {totalWeek.toFixed(2)}
-                          </td>
+                          <td className="px-2 py-1 text-left border border-black print:border-black italic">Total Semaine {weekNum}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black">{weekEsp.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black">{weekCb.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black">{weekChq.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black text-red-900">{weekDep.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black bg-gray-400 print:bg-gray-400">{totalWeek.toFixed(2)}</td>
                         </tr>
                       );
-                      
-                      // Reset compteurs
-                      weekEsp = 0;
-                      weekCb = 0;
-                      weekChq = 0;
-                      weekDep = 0;
-                      weekNum++;
+                      weekEsp = 0; weekCb = 0; weekChq = 0; weekDep = 0; weekNum++;
                     }
-
                     return rows;
                   });
                 })()}

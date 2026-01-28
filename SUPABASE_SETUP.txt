@@ -1,21 +1,25 @@
-CREATE TABLE IF NOT EXISTS caisse_sophie (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  date DATE UNIQUE NOT NULL,
-  especes DECIMAL(10,2) DEFAULT 0,
-  cb DECIMAL(10,2) DEFAULT 0,
-  cheques DECIMAL(10,2) DEFAULT 0,
-  depenses DECIMAL(10,2) DEFAULT 0
-);
+---------------------------------------------------------
+-- MISE A JOUR SECURITE (AUTHENTIFICATION REQUISE)
+---------------------------------------------------------
 
-ALTER TABLE caisse_sophie ENABLE ROW LEVEL SECURITY;
+1. Allez dans l'interface Supabase -> SQL Editor -> New Query.
+2. Copiez-collez le bloc ci-dessous pour sécuriser la table :
 
--- Suppression de la politique si elle existe déjà (pour éviter les erreurs)
+------------------- COPIER DEPUIS ICI -------------------
+
+-- 1. Supprimer l'ancienne politique "publique"
 DROP POLICY IF EXISTS "Acces total public" ON caisse_sophie;
 
-CREATE POLICY "Acces total public" 
+-- 2. Créer une politique stricte : seuls les utilisateurs connectés peuvent lire/écrire
+CREATE POLICY "Acces aux utilisateurs connectes uniquement" 
 ON caisse_sophie 
 FOR ALL 
-TO anon 
+TO authenticated 
 USING (true) 
 WITH CHECK (true);
+
+------------------- FIN DU SCRIPT SQL -------------------
+
+3. Cliquez sur "Run".
+
+Désormais, impossible d'accéder aux données sans être connecté avec un compte utilisateur valide !
