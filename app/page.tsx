@@ -275,7 +275,7 @@ export default function SophieCaisse() {
         <div className="flex bg-indigo-800/50 p-1 rounded-xl mt-6 max-w-xs mx-auto backdrop-blur-sm">
           <button onClick={() => setViewMode('form')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${viewMode === 'form' ? 'bg-white text-indigo-600 shadow-sm' : 'text-white/70 hover:text-white'}`}><LayoutGrid size={16} /> Saisie</button>
           <button onClick={() => setViewMode('table')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${viewMode === 'table' ? 'bg-white text-indigo-600 shadow-sm' : 'text-white/70 hover:text-white'}`}><TableIcon size={16} /> Tableau</button>
-          <button onClick={() => setViewMode('stats')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${viewMode === 'stats' ? 'bg-white text-indigo-600 shadow-sm' : 'text-white/70 hover:text-white'}`}><PieChartIcon size={16} /> Bilan</button>
+          <button onClick={() => setViewMode('stats')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${viewMode === 'stats' ? 'bg-white text-indigo-600 shadow-sm ring-2 ring-indigo-200' : 'text-white/70 hover:text-white'}`}><PieChartIcon size={16} /> Bilan</button>
         </div>
       </header>
 
@@ -331,8 +331,18 @@ export default function SophieCaisse() {
             {/* VUE STATISTIQUES */}
             <div className="space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
               
-              {/* 1. Cartes KPIs */}
-              <div className="grid grid-cols-2 gap-4">
+              {monthEntries.length === 0 ? (
+                <div className="text-center py-10 bg-white rounded-3xl shadow-sm border border-slate-100">
+                  <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                    <PieChartIcon size={32} />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700">Pas de données</h3>
+                  <p className="text-slate-500 text-sm">Aucune saisie trouvée pour {format(selectedDate, 'MMMM yyyy', { locale: fr })}.</p>
+                </div>
+              ) : (
+                <>
+                  {/* 1. Cartes KPIs */}
+                  <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 col-span-2">
                   <div className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Chiffre d'Affaires</div>
                   <div className="text-4xl font-black text-slate-800">{totalCA.toFixed(2)} <span className="text-lg text-slate-400 font-medium">€</span></div>
