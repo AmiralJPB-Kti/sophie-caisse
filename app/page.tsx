@@ -98,8 +98,20 @@ export default function SophieCaisse() {
     if (!session) return;
     setLoadingData(true);
     const { data, error } = await supabase.from('caisse_sophie').select('*').order('date', { ascending: true });
-    if (error) console.error(error);
-    else setEntries(data || []);
+    if (error) {
+      console.error(error);
+      alert("Erreur de connexion aux données !");
+    } else {
+      // Conversion sécurisée des données (Strings -> Numbers) pour éviter le crash .toFixed()
+      const cleanData = (data || []).map((d: any) => ({
+        ...d,
+        especes: parseFloat(d.especes) || 0,
+        cb: parseFloat(d.cb) || 0,
+        cheques: parseFloat(d.cheques) || 0,
+        depenses: parseFloat(d.depenses) || 0
+      }));
+      setEntries(cleanData);
+    }
     setLoadingData(false);
   };
 
@@ -405,85 +417,38 @@ export default function SophieCaisse() {
               </thead>
               <tbody>
                 {(() => {
-                  let weekEsp = 0;
-                  let weekCb = 0;
-                  let weekChq = 0;
-                  let weekDep = 0;
-                  let weekNum = 1;
-
-                  return daysInMonth.map((day, index) => {
+                  let week = { e: 0, cb: 0, cq: 0, d: 0, n: 1 };
+                  return daysInMonth.flatMap((day, index) => {
                     const data = getDayData(day);
-                    
-                    // Cumul semaine
-                    weekEsp += data.especes;
-                    weekCb += data.cb;
-                    weekChq += data.cheques;
-                    weekDep += data.depenses;
-
+                    week.e += data.especes; week.cb += data.cb; week.cq += data.cheques; week.d += data.depenses;
                     const totalDay = data.especes + data.cb + data.cheques + data.depenses;
                     const isSunday = day.getDay() === 0;
                     const isLastDay = index === daysInMonth.length - 1;
                     
-                    const rows = [];
-
-                    // 1. Ligne du jour
-                    rows.push(
-                      <tr key={day.toString()} className={`${isSunday ? 'bg-slate-50 print:bg-slate-50' : ''}`}>
-                        <td className="px-2 py-1 font-medium text-black border border-slate-400 print:border-black capitalize">
-                          {format(day, 'EEE d', { locale: fr })}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">
-                          {data.especes !== 0 ? data.especes.toFixed(2) : ''}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">
-                          {data.cb !== 0 ? data.cb.toFixed(2) : ''}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">
-                          {data.cheques !== 0 ? data.cheques.toFixed(2) : ''}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black text-black">
-                          {data.depenses !== 0 ? data.depenses.toFixed(2) : ''}
-                        </td>
-                        <td className="px-2 py-1 text-right font-mono font-bold text-black bg-gray-50 border border-slate-400 print:border-black">
-                          {totalDay !== 0 ? totalDay.toFixed(2) : ''}
-                        </td>
+                    const rows = [
+                      <tr key={`day-${day.toString()}`} className={`${isSunday ? 'bg-slate-50 print:bg-slate-50' : ''}`}>
+                        <td className="px-2 py-1 font-medium text-black border border-slate-400 print:border-black capitalize">{format(day, 'EEE d', { locale: fr })}</td>
+                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">{data.especes !== 0 ? data.especes.toFixed(2) : ''}</td>
+                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">{data.cb !== 0 ? data.cb.toFixed(2) : ''}</td>
+                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black">{data.cheques !== 0 ? data.cheques.toFixed(2) : ''}</td>
+                        <td className="px-2 py-1 text-right font-mono border border-slate-400 print:border-black text-black">{data.depenses !== 0 ? data.depenses.toFixed(2) : ''}</td>
+                        <td className="px-2 py-1 text-right font-mono font-bold text-black bg-gray-50 border border-slate-400 print:border-black">{totalDay !== 0 ? totalDay.toFixed(2) : ''}</td>
                       </tr>
-                    );
+                    ];
 
-                    // 2. Ligne Total Semaine (si Dimanche ou Fin de mois)
                     if (isSunday || isLastDay) {
-                      const totalWeek = weekEsp + weekCb + weekChq + weekDep;
                       rows.push(
-                        <tr key={`week-${weekNum}`} className="bg-gray-300 print:bg-gray-300 font-bold border-t-2 border-black">
-                          <td className="px-2 py-1 text-left border border-black print:border-black italic">
-                            Total Semaine {weekNum}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black">
-                            {weekEsp.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black">
-                            {weekCb.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black">
-                            {weekChq.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black text-red-900">
-                            {weekDep.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1 text-right border border-black print:border-black bg-gray-400 print:bg-gray-400">
-                            {totalWeek.toFixed(2)}
-                          </td>
+                        <tr key={`week-${week.n}`} className="bg-gray-300 print:bg-gray-300 font-bold border-t-2 border-black">
+                          <td className="px-2 py-1 text-left border border-black print:border-black italic">Total Semaine {week.n}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black">{week.e.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black">{week.cb.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black">{week.cq.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black text-red-900">{week.d.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right border border-black print:border-black bg-gray-400 print:bg-gray-400">{(week.e + week.cb + week.cq + week.d).toFixed(2)}</td>
                         </tr>
                       );
-                      
-                      // Reset compteurs
-                      weekEsp = 0;
-                      weekCb = 0;
-                      weekChq = 0;
-                      weekDep = 0;
-                      weekNum++;
+                      week = { e: 0, cb: 0, cq: 0, d: 0, n: week.n + 1 };
                     }
-
                     return rows;
                   });
                 })()}
