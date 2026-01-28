@@ -5,7 +5,7 @@ import {
   Calendar, Banknote, CreditCard, Receipt, ShoppingBag, Save, Edit2,
   ChevronLeft, ChevronRight, Download, X, Table as TableIcon, LayoutGrid,
   Trash2, RefreshCw, Lock, User, LogOut, Mail, PieChart as PieChartIcon,
-  FileSpreadsheet, FileText, Printer
+  FileSpreadsheet, FileText, Printer, Eye, EyeOff
 } from 'lucide-react';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -25,6 +25,7 @@ export default function SophieCaisse() {
   const [session, setSession] = useState<any>(null);
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // État pour la visibilité du mot de passe
   const [loginError, setLoginError] = useState("");
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -179,7 +180,25 @@ export default function SophieCaisse() {
           <h1 className="text-2xl font-bold text-slate-800">Caisse de Sophie</h1>
           <form onSubmit={handleLogin} className="space-y-4 text-left">
             <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Email</label><div className="relative"><Mail className="absolute left-3 top-3 text-slate-400" size={20} /><input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10" placeholder="sophie@exemple.com" /></div></div>
-            <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Mot de passe</label><div className="relative"><Lock className="absolute left-3 top-3 text-slate-400" size={20} /><input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10" placeholder="••••••••" /></div></div>
+            <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Mot de passe</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={passwordInput} 
+                  onChange={(e) => setPasswordInput(e.target.value)} 
+                  className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10 pr-10" 
+                  placeholder="••••••••" 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-indigo-500"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
             {loginError && <p className="text-red-500 text-xs font-bold text-center">{loginError}</p>}
             <button type="submit" disabled={loadingAuth} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl transition-all active:scale-95">{loadingAuth ? 'Connexion...' : 'Se connecter'}</button>
           </form>
@@ -196,7 +215,23 @@ export default function SophieCaisse() {
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
             <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Mot de passe</h3><X className="cursor-pointer" onClick={() => setShowProfileModal(false)} /></div>
             <form onSubmit={handleChangePassword} className="space-y-4">
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe" className="w-full border-2 p-3 rounded-xl" autoFocus />
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                  placeholder="Nouveau mot de passe" 
+                  className="w-full border-2 p-3 rounded-xl pr-10" 
+                  autoFocus 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-indigo-500"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
               {msgProfile && <p className="text-xs text-center font-bold">{msgProfile}</p>}
               <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Valider</button>
             </form>
