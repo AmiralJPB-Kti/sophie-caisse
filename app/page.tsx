@@ -212,11 +212,33 @@ export default function SophieCaisse() {
           <div><h1 className="font-bold text-xl">Caisse de Sophie</h1><button onClick={() => setShowProfileModal(true)} className="text-xs opacity-80 flex items-center gap-1 hover:underline"><User size={12} /> {session.user.email} (Modifier)</button></div>
           <div className="flex gap-3"><Download className="cursor-pointer hover:scale-110 transition" onClick={() => window.print()} /><LogOut className="cursor-pointer hover:scale-110 transition" onClick={handleLogout} /></div>
         </div>
+        {/* Navigation Date avec Sélecteur Rapide */}
         <div className="max-w-md mx-auto flex justify-between items-center mt-6">
-          <button onClick={() => setSelectedDate(subDays(selectedDate, viewMode === 'form' ? 1 : 30))}><ChevronLeft /></button>
-          <div className="text-center"><div className="text-xs uppercase opacity-70 font-bold">{format(selectedDate, viewMode === 'form' ? 'EEEE' : 'MMMM', { locale: fr })}</div><div className="text-xl font-bold">{format(selectedDate, viewMode === 'form' ? 'd MMMM yyyy' : 'MMMM yyyy', { locale: fr })}</div></div>
-          <button onClick={() => setSelectedDate(addDays(selectedDate, viewMode === 'form' ? 1 : 30))}><ChevronRight /></button>
+          <button onClick={() => setSelectedDate(subDays(selectedDate, viewMode === 'form' ? 1 : 30))} className="p-2 hover:bg-white/10 rounded-full transition"><ChevronLeft /></button>
+          
+          <div className="text-center relative group cursor-pointer">
+            <div className="text-xs uppercase opacity-70 font-bold group-hover:opacity-100 transition">
+              {viewMode === 'form' ? format(selectedDate, 'EEEE', { locale: fr }) : 'Mois de'}
+            </div>
+            <div className="text-xl font-bold flex items-center justify-center gap-2">
+              {format(selectedDate, viewMode === 'form' ? 'd MMMM yyyy' : 'MMMM yyyy', { locale: fr })}
+              <Calendar size={16} className="opacity-50 group-hover:opacity-100" />
+            </div>
+            {/* Input Date invisible qui recouvre le texte pour déclencher le calendrier natif */}
+            <input 
+              type="date" 
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              value={format(selectedDate, 'yyyy-MM-dd')}
+              onChange={(e) => { if(e.target.valueAsDate) setSelectedDate(e.target.valueAsDate); }}
+            />
+          </div>
+
+          <button onClick={() => setSelectedDate(addDays(selectedDate, viewMode === 'form' ? 1 : 30))} className="p-2 hover:bg-white/10 rounded-full transition"><ChevronRight /></button>
         </div>
+
+        {/* Date simplifiée en mode Saisie (SUPPRIMÉE car redondante avec le header principal qui gère maintenant tout) */}
+
+        {/* MENU PRINCIPAL */}
         <div className="max-w-xs mx-auto flex bg-indigo-800/50 p-1 rounded-xl mt-6">
           <button onClick={() => setViewMode('form')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${viewMode === 'form' ? 'bg-white text-indigo-600' : ''}`}><LayoutGrid size={16}/> Saisie</button>
           <button onClick={() => setViewMode('table')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${viewMode === 'table' ? 'bg-white text-indigo-600' : ''}`}><TableIcon size={16}/> Tableau</button>
