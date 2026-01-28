@@ -46,13 +46,11 @@ export default function SophieCaisse() {
   // --- GESTION AUTHENTIFICATION SUPABASE ---
 
   useEffect(() => {
-    // Vérifier si une session existe déjà au chargement
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setCheckingSession(false);
     });
 
-    // Écouter les changements d'état (connexion/déconnexion)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -80,10 +78,9 @@ export default function SophieCaisse() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // Le state 'session' sera mis à jour automatiquement via onAuthStateChange
   };
 
-  // --- APP LOGIC (Reste inchangé) ---
+  // --- APP LOGIC ---
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<Entry[]>([]);
   const [viewMode, setViewMode] = useState<'form' | 'table'>('form');
@@ -123,10 +120,8 @@ export default function SophieCaisse() {
     setLoadingAuth(false);
   };
 
-  // Charger les données (seulement si session active)
   const loadEntries = async () => {
     if (!session) return;
-    
     setLoadingData(true);
     const { data, error } = await supabase
       .from('caisse_sophie')
@@ -148,7 +143,6 @@ export default function SophieCaisse() {
     }
   }, [session]);
 
-  // Sync formulaire avec date
   useEffect(() => {
     const existing = entries.find(e => e.date === format(selectedDate, 'yyyy-MM-dd'));
     if (existing) {
@@ -236,8 +230,6 @@ export default function SophieCaisse() {
   const totalMonthDepenses = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr).reduce((acc, e) => acc + e.depenses, 0);
   const grandTotalMonth = totalMonthEspeces + totalMonthCB + totalMonthCheques + totalMonthDepenses;
 
-  // --- RENDER ---
-
   if (checkingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-indigo-600">
@@ -246,7 +238,6 @@ export default function SophieCaisse() {
     );
   }
 
-  // Écran de Login (Si pas de session)
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -311,23 +302,27 @@ export default function SophieCaisse() {
     );
   }
 
-  // Écran App (Si session active)
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 print:bg-white print:pb-0">
+    <div className="min-h-screen bg-slate-50 pb-20 print:bg-white print:pb-0 relative">
       
       {/* MODAL PROFIL */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm animate-in fade-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4 border-b pb-2">
               <h3 className="text-lg font-bold text-slate-800">Changer le mot de passe</h3>
-              <button onClick={() => setShowProfileModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button 
+                onClick={() => setShowProfileModal(false)} 
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition"
+              >
                 <X size={24} />
               </button>
             </div>
             
             <form onSubmit={handleChangePassword} className="space-y-4">
-              <p className="text-sm text-slate-600 mb-2">Entrez votre nouveau mot de passe pour <strong>{session.user.email}</strong>.</p>
+              <p className="text-sm text-slate-600 mb-2">
+                Compte : <strong>{session.user.email}</strong>
+              </p>
               
               <input
                 type="password"
@@ -344,13 +339,22 @@ export default function SophieCaisse() {
                 </p>
               )}
               
-              <button 
-                type="submit"
-                disabled={loadingAuth}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl mt-2"
-              >
-                {loadingAuth ? 'Modification...' : 'Confirmer'}
-              </button>
+              <div className="flex gap-2 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl transition"
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="submit"
+                  disabled={loadingAuth}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition"
+                >
+                  {loadingAuth ? '...' : 'Valider'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -361,10 +365,10 @@ export default function SophieCaisse() {
           <div>
             <h1 className="text-xl font-bold tracking-tight">Caisse de Sophie</h1>
             <button 
-              onClick={() => setShowProfileModal(true)}
-              className="text-xs text-indigo-200 flex items-center gap-1 hover:text-white hover:underline transition mt-1"
+              onClick={() => { console.log("Click Profil"); setShowProfileModal(true); }}
+              className="text-xs text-indigo-200 flex items-center gap-1 hover:text-white hover:underline transition mt-1 cursor-pointer"
             >
-              <User size={12} /> {session.user.email} (Profil)
+              <User size={12} /> {session.user.email} (Modifier)
             </button>
           </div>
           <div className="flex gap-2">
@@ -377,7 +381,6 @@ export default function SophieCaisse() {
           </div>
         </div>
         
-        {/* Navigation Mois / Sélecteur ... */}
         <div className="flex items-center justify-between mt-6 max-w-md mx-auto">
              <button onClick={() => setSelectedDate(subDays(selectedDate, viewMode === 'table' ? 30 : 1))} className="p-2 hover:bg-white/10 rounded-full transition">
                <ChevronLeft />
@@ -398,7 +401,6 @@ export default function SophieCaisse() {
              </button>
         </div>
 
-        {/* Toggle Vue ... */}
         <div className="flex bg-indigo-800/50 p-1 rounded-xl mt-6 max-w-xs mx-auto backdrop-blur-sm">
           <button 
             onClick={() => setViewMode('form')}
@@ -415,6 +417,7 @@ export default function SophieCaisse() {
         </div>
       </header>
 
+      {/* Titre Impression */}
       <div className="hidden print:block text-center mt-8 mb-8">
         <h1 className="text-2xl font-bold border-b-2 border-black pb-2 inline-block">
           FEUILLE DE REMISE DE CAISSE - {format(selectedDate, 'MMMM yyyy', { locale: fr }).toUpperCase()}
@@ -427,6 +430,7 @@ export default function SophieCaisse() {
         ) : viewMode === 'form' ? (
           <>
             <div className="bg-white rounded-3xl shadow-xl p-6 space-y-6 border border-slate-100">
+              {/* Contenu Formulaire (identique) */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                   <Calendar className="text-indigo-500" size={20} />
@@ -520,9 +524,9 @@ export default function SophieCaisse() {
             </div>
           </>
         ) : (
-          /* Vue Tableau ... (identique, abrégée pour le remplacement) */
           <div className="bg-white p-1 overflow-hidden print:shadow-none print:border-none">
             <table className="w-full border-collapse text-sm">
+              {/* Contenu Tableau (identique) */}
               <thead>
                 <tr className="bg-gray-100 print:bg-gray-200">
                   <th className="px-2 py-2 text-left font-bold text-black border border-slate-400 print:border-black w-32">Jour</th>
