@@ -8,45 +8,45 @@
 
 ## 🛠️ JOURNAL DES INTERVENTIONS
 
-### 📅 Mardi 27 Janvier 2026 (Lancement & V1.0)
+### 📅 Mardi 27 Janvier 2026 (Lancement & V1.2)
 **État :** ✅ Mise en production
-**Résumé :** Transformation d'un script Python local en Web App sécurisée (SaaS).
+**Résumé :** Transformation d'un script Python local en Web App sécurisée (SaaS) avec Bilan Statistique.
 
 #### 1. Interface & UX (Frontend)
 - Initialisation projet **Next.js 15** + **Tailwind CSS**.
 - Création d'une **Vue "Saisie Rapide"** (Gros boutons, UX mobile) pour l'usage quotidien.
 - Création d'une **Vue "Tableur Comptable"** (Style Excel, Lignes hebdos, Totaux) pour rassurer et imprimer.
+- **NOUVEAU :** Ajout d'un onglet **"Bilan"** avec graphiques animés (Recharts).
+    - Indicateurs : Chiffre d'Affaires, Dépenses, Moyenne journalière.
+    - Graphiques : Répartition (Donut) et Évolution (Histogramme).
 - Ajout d'un **Mode Impression (PDF)** propre sans l'interface autour.
 - Système de modification/suppression de l'historique récent.
 
 #### 2. Données & Persistance (Backend)
 - Migration du stockage local (localStorage) vers **Supabase** (PostgreSQL).
 - Création de la table `caisse_sophie` avec colonnes typées (Decimal, Date).
-- Script d'injection SQL automatisé pour le déploiement rapide.
+- Mise en place d'une synchronisation Cloud en temps réel.
 
 #### 3. Sécurité & Éthique (Auth)
 - Mise en place de **Supabase Auth** (Email/Password).
 - Création d'une **Whitelist (Liste d'invités)** via la table `sophie_autorisations`.
-- Sécurité **RLS (Row Level Security)** : Impossible de lire les données si l'email n'est pas autorisé, même avec un mot de passe valide.
-- Ajout d'une modale **"Changer mon mot de passe"** pour l'autonomie de l'utilisateur.
+- Sécurité **RLS (Row Level Security)** stricte : accès réservé aux emails autorisés.
+- **NOUVEAU :** Ajout d'une modale **"Profil"** permettant à l'utilisateur de changer son mot de passe en autonomie.
 
 #### 4. Déploiement (DevOps)
 - Hébergement sur **Vercel** (HTTPS/SSL automatique).
-- Gestion des variables d'environnement (`SUPABASE_URL`, `ANON_KEY`).
-- Nettoyage des dépendances et sécurisation du build (Next.js 15.1.12).
+- Gestion des variables d'environnement sécurisées.
+- Correction des bugs de build liés à la version de Next.js (Fix 15.1.12).
 
 ---
 
 ## 🚀 LABORATOIRE D'IDÉES & ÉVOLUTIONS (Roadmap)
 
 ### 🎯 Court Terme (Pour Sophie)
-- [ ] **Tableau de Bord (Dashboard) :**
-    - Graphique : Évolution du CA jour par jour vs Mois précédent.
-    - Camembert : Répartition des encaissements (CB vs Espèces).
-- [ ] **Export Comptable :**
-    - Génération d'un fichier `.csv` ou `.xls` compatible avec le logiciel de son comptable (EBP, Sage, Ciel...).
-- [ ] **Gestion des Dépenses :**
-    - Pouvoir prendre en photo un ticket de caisse (justificatif) lors de la saisie d'une dépense en espèces (Stockage Supabase Storage).
+- [x] **Tableau de Bord (Dashboard) :** Terminé (V1.2).
+- [ ] **Export Comptable :** Génération d'un fichier `.csv` ou `.xls` compatible avec le logiciel de son comptable.
+- [ ] **Gestion des Dépenses :** Photos des tickets de caisse.
+
 
 ### 🌍 Moyen Terme (Adaptation autres TPE/Artisans)
 *Idées pour dupliquer ce projet vers d'autres secteurs.*

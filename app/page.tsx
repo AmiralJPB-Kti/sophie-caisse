@@ -1,27 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  Banknote, 
-  CreditCard, 
-  Receipt, 
-  ShoppingBag, 
-  Save, 
-  Edit2, 
-  ChevronLeft, 
-  ChevronRight,
-  Download,
-  X,
-  Table as TableIcon,
-  LayoutGrid,
-  Trash2,
-  RefreshCw,
-  Lock,
-  User,
-  LogOut,
-  Mail,
-  PieChart as PieChartIcon
+import {
+  Calendar, Banknote, CreditCard, Receipt, ShoppingBag, Save, Edit2,
+  ChevronLeft, ChevronRight, Download, X, Table as TableIcon, LayoutGrid,
+  Trash2, RefreshCw, Lock, User, LogOut, Mail, PieChart as PieChartIcon,
+  FileSpreadsheet, FileText, Printer, File
 } from 'lucide-react';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -45,25 +29,18 @@ export default function SophieCaisse() {
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  // --- AUTHENTIFICATION ---
+  // --- AUTH ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setCheckingSession(false);
-    });
+    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setCheckingSession(false); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
     return () => subscription.unsubscribe();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoadingAuth(true);
-    setLoginError("");
+    e.preventDefault(); setLoadingAuth(true); setLoginError("");
     const { error } = await supabase.auth.signInWithPassword({ email: emailInput, password: passwordInput });
-    if (error) setLoginError("Email ou mot de passe incorrect.");
-    setLoadingAuth(false);
+    if (error) setLoginError("Email ou mot de passe incorrect."); setLoadingAuth(false);
   };
-
   const handleLogout = async () => await supabase.auth.signOut();
 
   // --- APP STATE ---
@@ -73,85 +50,86 @@ export default function SophieCaisse() {
   const [formData, setFormData] = useState({ especes: '', cb: '', cheques: '', depenses: '' });
   const [isEditing, setIsEditing] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false); // Menu export
   const [newPassword, setNewPassword] = useState("");
   const [msgProfile, setMsgProfile] = useState("");
 
   const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword.length < 6) { setMsgProfile("Mini 6 caractères."); return; }
-    setLoadingAuth(true);
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) setMsgProfile("Erreur: " + error.message);
-    else {
-      setMsgProfile("Succès !");
-      setTimeout(() => { setShowProfileModal(false); setMsgProfile(""); setNewPassword(""); }, 1500);
-    }
+    e.preventDefault(); if (newPassword.length < 6) { setMsgProfile("Mini 6 caractères."); return; }
+    setLoadingAuth(true); const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) setMsgProfile("Erreur: " + error.message); else { setMsgProfile("Succès !"); setTimeout(() => { setShowProfileModal(false); setMsgProfile(""); setNewPassword(""); }, 1500); }
     setLoadingAuth(false);
   };
 
-  // --- DATA LOADING ---
   const loadEntries = async () => {
-    if (!session) return;
-    setLoadingData(true);
+    if (!session) return; setLoadingData(true);
     const { data, error } = await supabase.from('caisse_sophie').select('*').order('date', { ascending: true });
-    if (error) console.error(error);
-    else {
-      const cleanData = (data || []).map((d: any) => ({
-        ...d,
-        especes: parseFloat(d.especes) || 0,
-        cb: parseFloat(d.cb) || 0,
-        cheques: parseFloat(d.cheques) || 0,
-        depenses: parseFloat(d.depenses) || 0
-      }));
-      setEntries(cleanData);
+    if (error) console.error(error); else {
+      setEntries((data || []).map((d: any) => ({ ...d, especes: parseFloat(d.especes)||0, cb: parseFloat(d.cb)||0, cheques: parseFloat(d.cheques)||0, depenses: parseFloat(d.depenses)||0 })));
     }
     setLoadingData(false);
   };
-
   useEffect(() => { if (session) loadEntries(); }, [session]);
 
   useEffect(() => {
     const existing = entries.find(e => e.date === format(selectedDate, 'yyyy-MM-dd'));
-    if (existing) {
-      setFormData({
-        especes: existing.especes.toString(),
-        cb: existing.cb.toString(),
-        cheques: existing.cheques.toString(),
-        depenses: existing.depenses.toString()
-      });
-      setIsEditing(true);
-    } else {
-      setFormData({ especes: '', cb: '', cheques: '', depenses: '' });
-      setIsEditing(false);
-    }
+    if (existing) { setFormData({ especes: existing.especes.toString(), cb: existing.cb.toString(), cheques: existing.cheques.toString(), depenses: existing.depenses.toString() }); setIsEditing(true); }
+    else { setFormData({ especes: '', cb: '', cheques: '', depenses: '' }); setIsEditing(false); }
   }, [selectedDate, entries]);
 
-  // --- ACTIONS ---
   const handleSave = async () => {
     if (!session) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const entryData = {
-      date: dateStr,
-      especes: parseFloat(formData.especes || '0'),
-      cb: parseFloat(formData.cb || '0'),
-      cheques: parseFloat(formData.cheques || '0'),
-      depenses: parseFloat(formData.depenses || '0')
-    };
+    const entryData = { date: dateStr, especes: parseFloat(formData.especes || '0'), cb: parseFloat(formData.cb || '0'), cheques: parseFloat(formData.cheques || '0'), depenses: parseFloat(formData.depenses || '0') };
     const { error } = await supabase.from('caisse_sophie').upsert(entryData, { onConflict: 'date' });
-    if (error) alert("Erreur : " + error.message);
-    else { await loadEntries(); alert("Enregistré !"); }
+    if (error) alert("Erreur : " + error.message); else { await loadEntries(); alert("Enregistré !"); }
   };
-
-  const handleDelete = async (dateStr: string) => {
-    if (!session || !confirm("Supprimer cette entrée ?")) return;
-    const { error } = await supabase.from('caisse_sophie').delete().eq('date', dateStr);
-    if (error) alert("Erreur");
-    else await loadEntries();
-  };
-
+  const handleDelete = async (dateStr: string) => { if (!session || !confirm("Supprimer ?")) return; const { error } = await supabase.from('caisse_sophie').delete().eq('date', dateStr); if (error) alert("Erreur"); else await loadEntries(); };
   const clearField = (field: keyof typeof formData) => setFormData(prev => ({ ...prev, [field]: '' }));
+
+  // --- EXPORT LOGIC ---
+  const handleExportCSV = () => {
+    // CSV Header
+    let csvContent = "\uFEFFDate;Espèces;CB;Chèques;Dépenses;Total\n"; // UTF-8 BOM pour Excel
+    // Rows (All history or just current month? Let's do ALL history for backup purpose)
+    entries.forEach(e => {
+      const total = e.especes + e.cb + e.cheques + e.depenses;
+      csvContent += `${format(new Date(e.date), 'dd/MM/yyyy')};${e.especes.toString().replace('.',',')};${e.cb.toString().replace('.',',')};${e.cheques.toString().replace('.',',')};${e.depenses.toString().replace('.',',')};${total.toString().replace('.',',')}\n`;
+    });
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `export_caisse_sophie_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    setShowExportMenu(false);
+  };
+
+  const handleExportTXT = () => {
+    let txtContent = `JOURNAL DE CAISSE - SOPHIE\nGénéré le ${format(new Date(), 'dd/MM/yyyy')}\n\n`;
+    txtContent += "DATE       | ESPÈCES | CB      | CHÈQUES | DÉPENSES | TOTAL\n";
+    txtContent += "-----------|---------|---------|---------|----------|---------\n";
+    entries.forEach(e => {
+      const total = e.especes + e.cb + e.cheques + e.depenses;
+      const d = format(new Date(e.date), 'dd/MM/yyyy');
+      txtContent += `${d} | ${e.especes.toFixed(2).padStart(7)} | ${e.cb.toFixed(2).padStart(7)} | ${e.cheques.toFixed(2).padStart(7)} | ${e.depenses.toFixed(2).padStart(8)} | ${total.toFixed(2).padStart(7)}\n`;
+    });
+    const blob = new Blob([txtContent], { type: "text/plain;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `export_caisse_sophie_${format(new Date(), 'yyyy-MM-dd')}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    setShowExportMenu(false);
+  };
+
+  const handlePrint = () => {
+    window.print();
+    setShowExportMenu(false);
+  };
 
   // --- CALCULS ---
   const totalDay = parseFloat(formData.especes || '0') + parseFloat(formData.cb || '0') + parseFloat(formData.cheques || '0') + parseFloat(formData.depenses || '0');
@@ -162,18 +140,18 @@ export default function SophieCaisse() {
   
   const currentMonthStr = format(selectedDate, 'MM-yyyy');
   const monthEntries = entries.filter(e => format(new Date(e.date), 'MM-yyyy') === currentMonthStr);
-  const totalMonthEspeces = monthEntries.reduce((acc, e) => acc + e.especes, 0);
+  const totalMonthEsp = monthEntries.reduce((acc, e) => acc + e.especes, 0);
   const totalMonthCB = monthEntries.reduce((acc, e) => acc + e.cb, 0);
-  const totalMonthCheques = monthEntries.reduce((acc, e) => acc + e.cheques, 0);
-  const totalMonthDepenses = monthEntries.reduce((acc, e) => acc + e.depenses, 0);
-  const totalCA = totalMonthEspeces + totalMonthCB + totalMonthCheques;
-  const grandTotalNet = totalCA + totalMonthDepenses;
+  const totalMonthChq = monthEntries.reduce((acc, e) => acc + e.cheques, 0);
+  const totalMonthDep = monthEntries.reduce((acc, e) => acc + e.depenses, 0);
+  const totalCA = totalMonthEsp + totalMonthCB + totalMonthChq;
+  const grandTotalNet = totalCA + totalMonthDep;
   const avgDay = monthEntries.length > 0 ? totalCA / monthEntries.length : 0;
 
-  const dataPie = [{ name: 'Espèces', value: totalMonthEspeces, color: '#16a34a' }, { name: 'CB', value: totalMonthCB, color: '#2563eb' }, { name: 'Chèques', value: totalMonthCheques, color: '#9333ea' }].filter(d => d.value > 0);
+  const dataPie = [{ name: 'Espèces', value: totalMonthEsp, color: '#16a34a' }, { name: 'CB', value: totalMonthCB, color: '#2563eb' }, { name: 'Chèques', value: totalMonthChq, color: '#9333ea' }].filter(d => d.value > 0);
   const dataBar = daysInMonth.map(day => ({ day: format(day, 'dd'), CA: getDayData(day).especes + getDayData(day).cb + getDayData(day).cheques }));
 
-  if (checkingSession) return <div className="min-h-screen flex items-center justify-center"><RefreshCw className="animate-spin text-indigo-600" /></div>;
+  if (checkingSession) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><RefreshCw className="animate-spin text-indigo-600" /></div>;
 
   if (!session) {
     return (
@@ -185,7 +163,7 @@ export default function SophieCaisse() {
             <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Email</label><div className="relative"><Mail className="absolute left-3 top-3 text-slate-400" size={20} /><input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10" placeholder="sophie@exemple.com" /></div></div>
             <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Mot de passe</label><div className="relative"><Lock className="absolute left-3 top-3 text-slate-400" size={20} /><input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full border-2 p-3 rounded-xl outline-none focus:border-indigo-500 pl-10" placeholder="••••••••" /></div></div>
             {loginError && <p className="text-red-500 text-xs font-bold text-center">{loginError}</p>}
-            <button type="submit" disabled={loadingAuth} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl transition-all active:scale-95">{loadingAuth ? 'Connexion...' : 'Se connecter'}</button>
+            <button type="submit" disabled={loadingAuth} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">{loadingAuth ? '...' : 'Se connecter'}</button>
           </form>
         </div>
       </div>
@@ -194,6 +172,7 @@ export default function SophieCaisse() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 relative">
+      {/* MODAL PROFIL */}
       {showProfileModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
@@ -208,37 +187,68 @@ export default function SophieCaisse() {
       )}
 
       <header className="bg-indigo-600 text-white p-6 rounded-b-3xl print:hidden shadow-lg">
-        <div className="max-w-md mx-auto flex justify-between items-center">
-          <div><h1 className="font-bold text-xl">Caisse de Sophie</h1><button onClick={() => setShowProfileModal(true)} className="text-xs opacity-80 flex items-center gap-1 hover:underline"><User size={12} /> {session.user.email} (Modifier)</button></div>
-          <div className="flex gap-3"><Download className="cursor-pointer hover:scale-110 transition" onClick={() => window.print()} /><LogOut className="cursor-pointer hover:scale-110 transition" onClick={handleLogout} /></div>
-        </div>
-        {/* Navigation Date avec Sélecteur Rapide */}
-        <div className="max-w-md mx-auto flex justify-between items-center mt-6">
-          <button onClick={() => setSelectedDate(subDays(selectedDate, viewMode === 'form' ? 1 : 30))} className="p-2 hover:bg-white/10 rounded-full transition"><ChevronLeft /></button>
-          
-          <div className="text-center relative group cursor-pointer">
-            <div className="text-xs uppercase opacity-70 font-bold group-hover:opacity-100 transition">
-              {viewMode === 'form' ? format(selectedDate, 'EEEE', { locale: fr }) : 'Mois de'}
-            </div>
-            <div className="text-xl font-bold flex items-center justify-center gap-2">
-              {format(selectedDate, viewMode === 'form' ? 'd MMMM yyyy' : 'MMMM yyyy', { locale: fr })}
-              <Calendar size={16} className="opacity-50 group-hover:opacity-100" />
-            </div>
-            {/* Input Date invisible qui recouvre le texte pour déclencher le calendrier natif */}
-            <input 
-              type="date" 
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              value={format(selectedDate, 'yyyy-MM-dd')}
-              onChange={(e) => { if(e.target.valueAsDate) setSelectedDate(e.target.valueAsDate); }}
-            />
+        <div className="max-w-md mx-auto flex justify-between items-center relative">
+          <div>
+            <h1 className="font-bold text-xl">Caisse de Sophie</h1>
+            <button onClick={() => setShowProfileModal(true)} className="text-xs opacity-80 flex items-center gap-1 hover:underline"><User size={12} /> {session.user.email}</button>
           </div>
+          <div className="flex gap-3 relative">
+            
+            {/* BOUTON EXPORT / DOWNLOAD */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowExportMenu(!showExportMenu)} 
+                className={`bg-white/20 p-2 rounded-full transition hover:bg-white/30 ${showExportMenu ? 'bg-white/40 ring-2 ring-white' : ''}`}
+                title="Exporter / Imprimer"
+              >
+                <Download size={20} />
+              </button>
 
-          <button onClick={() => setSelectedDate(addDays(selectedDate, viewMode === 'form' ? 1 : 30))} className="p-2 hover:bg-white/10 rounded-full transition"><ChevronRight /></button>
+              {/* MENU DÉROULANT EXPORT */}
+              {showExportMenu && (
+                <div className="absolute right-0 top-12 bg-white text-slate-800 rounded-xl shadow-2xl p-2 w-56 z-50 animate-in fade-in zoom-in duration-200 border border-slate-100">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase px-3 py-2">Exporter les données</div>
+                  <button onClick={handleExportCSV} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium transition text-sm">
+                    <FileSpreadsheet size={18} className="text-green-600" /> Excel (.csv)
+                  </button>
+                  <button onClick={handleExportTXT} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium transition text-sm">
+                    <FileText size={18} className="text-slate-600" /> Texte (.txt)
+                  </button>
+                  <div className="h-px bg-slate-100 my-1"></div>
+                  <button onClick={handlePrint} className="w-full text-left px-3 py-3 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-bold text-indigo-600 transition text-sm">
+                    <Printer size={18} /> Imprimer en PDF
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button onClick={handleLogout} className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100"><LogOut size={20} /></button>
+          </div>
         </div>
 
-        {/* Date simplifiée en mode Saisie (SUPPRIMÉE car redondante avec le header principal qui gère maintenant tout) */}
+        {/* Navigation Date (avec Calendrier Natif) */}
+        <div className={`max-w-md mx-auto flex justify-between items-center mt-6 ${viewMode === 'form' ? 'hidden' : ''}`}> 
+          <button onClick={() => setSelectedDate(subDays(selectedDate, 30))}><ChevronLeft /></button>
+          <div className="text-center relative group cursor-pointer">
+            <div className="text-xs uppercase opacity-70 font-bold group-hover:opacity-100 transition">Mois de</div>
+            <div className="text-xl font-bold flex items-center justify-center gap-2">{format(selectedDate, 'MMMM yyyy', { locale: fr })} <Calendar size={16} className="opacity-50" /></div>
+            <input type="date" className="absolute inset-0 opacity-0 cursor-pointer" value={format(selectedDate, 'yyyy-MM-dd')} onChange={(e) => { if(e.target.valueAsDate) setSelectedDate(e.target.valueAsDate); }} />
+          </div>
+          <button onClick={() => setSelectedDate(addDays(selectedDate, 30))}><ChevronRight /></button>
+        </div>
 
-        {/* MENU PRINCIPAL */}
+        {viewMode === 'form' && (
+          <div className="max-w-md mx-auto flex justify-between items-center mt-6">
+             <button onClick={() => setSelectedDate(subDays(selectedDate, 1))}><ChevronLeft /></button>
+             <div className="text-center relative group cursor-pointer">
+               <div className="text-xs uppercase opacity-70 font-bold">{format(selectedDate, 'EEEE', { locale: fr })}</div>
+               <div className="text-xl font-bold flex items-center justify-center gap-2">{format(selectedDate, 'd MMMM yyyy', { locale: fr })} <Calendar size={16} className="opacity-50" /></div>
+               <input type="date" className="absolute inset-0 opacity-0 cursor-pointer" value={format(selectedDate, 'yyyy-MM-dd')} onChange={(e) => { if(e.target.valueAsDate) setSelectedDate(e.target.valueAsDate); }} />
+             </div>
+             <button onClick={() => setSelectedDate(addDays(selectedDate, 1))}><ChevronRight /></button>
+          </div>
+        )}
+
         <div className="max-w-xs mx-auto flex bg-indigo-800/50 p-1 rounded-xl mt-6">
           <button onClick={() => setViewMode('form')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${viewMode === 'form' ? 'bg-white text-indigo-600' : ''}`}><LayoutGrid size={16}/> Saisie</button>
           <button onClick={() => setViewMode('table')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${viewMode === 'table' ? 'bg-white text-indigo-600' : ''}`}><TableIcon size={16}/> Tableau</button>
@@ -246,15 +256,15 @@ export default function SophieCaisse() {
         </div>
       </header>
 
-      <div className="hidden print:block text-center mt-8 mb-8"><h1 className="text-2xl font-bold border-b-2 border-black pb-2 inline-block">FEUILLE DE REMISE DE CAISSE - {format(selectedDate, 'MMMM yyyy', { locale: fr }).toUpperCase()}</h1></div>
+      <div className="hidden print:block text-center mt-8 mb-8"><h1 className="text-2xl font-bold border-b-2 border-black pb-2 inline-block">BILAN DE CAISSE - {format(selectedDate, 'MMMM yyyy', { locale: fr }).toUpperCase()}</h1></div>
 
-      <main className={`p-4 mx-auto ${viewMode === 'table' ? 'max-w-[98%] md:max-w-5xl' : 'max-w-md'} ${viewMode === 'stats' ? 'max-w-xl' : ''}`}>
+      <main className={`p-4 mx-auto ${viewMode === 'table' ? 'max-w-[98%] md:max-w-5xl' : 'max-w-md'} ${viewMode === 'stats' ? 'max-w-xl print:max-w-full print:w-full' : ''} -mt-4 print:mt-0`}>
         {loadingData ? <div className="text-center p-10"><RefreshCw className="animate-spin inline text-indigo-500" /></div> : 
          viewMode === 'form' ? (
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-3xl shadow-xl space-y-5 border border-slate-100">
               <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b pb-4"><Calendar size={20} className="text-indigo-500"/> {isEditing ? 'Modification du jour' : 'Saisie du jour'}</h2>
-              {[
+              {[ 
                 {id:'especes', label:'Espèces', icon:Banknote, color:'text-green-600'},
                 {id:'cb', label:'Carte Bancaire', icon:CreditCard, color:'text-blue-600'},
                 {id:'cheques', label:'Chèques', icon:Receipt, color:'text-purple-600'},
@@ -263,7 +273,7 @@ export default function SophieCaisse() {
                 <div key={f.id} className="relative">
                   <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">{f.label}</label>
                   <div className="relative">
-                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${f.color}`}><f.icon size={20} /></div>
+                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${f.color}`}>{<f.icon size={20} />}</div>
                     <input type="number" value={formData[f.id as keyof typeof formData]} onChange={(e) => setFormData({...formData, [f.id]: e.target.value})} onFocus={e => e.target.select()} className="w-full bg-slate-50 p-4 pl-12 rounded-2xl border-2 border-slate-100 outline-none focus:border-indigo-500 font-bold text-lg" placeholder="0.00" />
                     {formData[f.id as keyof typeof formData] && <X className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 cursor-pointer" onClick={() => clearField(f.id as keyof typeof formData)} />}
                   </div>
@@ -284,19 +294,21 @@ export default function SophieCaisse() {
             </div>
           </div>
          ) : viewMode === 'stats' ? (
-          <div className="space-y-6 pb-10">
+          <div className="space-y-6 pb-10 print:space-y-4 print:grid print:grid-cols-2 print:gap-4 print:pb-0">
             {monthEntries.length === 0 ? <div className="bg-white p-12 rounded-3xl text-center font-bold text-slate-400 border-2 border-dashed">Aucune donnée pour ce mois</div> : (
               <>
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><div className="text-xs font-bold text-slate-400 uppercase mb-1 tracking-widest">Chiffre d'Affaires</div><div className="text-5xl font-black text-slate-800">{totalCA.toFixed(2)} €</div></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dépenses</div><div className="text-2xl font-black text-red-500">{totalMonthDepenses.toFixed(2)} €</div></div>
-                  <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Moy/Jour</div><div className="text-2xl font-black text-indigo-600">{avgDay.toFixed(0)} €</div></div>
+                {/* BLOC KPIS - Optimisé Print pour être sur une ligne */}
+                <div className="print:col-span-2 flex flex-col md:flex-row print:flex-row gap-4">
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex-1"><div className="text-xs font-bold text-slate-400 uppercase mb-1 tracking-widest">Chiffre d'Affaires</div><div className="text-5xl font-black text-slate-800">{totalCA.toFixed(2)} €</div></div>
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dépenses</div><div className="text-2xl font-black text-red-500">{totalMonthDepenses.toFixed(2)} €</div></div>
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Moy/Jour</div><div className="text-2xl font-black text-indigo-600">{avgDay.toFixed(0)} €</div></div>
                 </div>
-                <div className="bg-white p-6 rounded-3xl shadow-sm h-72 border border-slate-100" style={{ minHeight: '300px' }}>
+
+                <div className="bg-white p-6 rounded-3xl shadow-sm h-72 border border-slate-100 print:h-64 print:col-span-1 print:border-black" style={{ minHeight: '300px' }}>
                    <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2"><PieChartIcon size={18} className="text-indigo-500"/> Répartition des encaissements</h3>
                    <ResponsiveContainer width="100%" height="90%"><PieChart><Pie data={dataPie} innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value" stroke="none">{dataPie.map((entry, index) => (<Cell key={index} fill={entry.color} />))}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
                 </div>
-                <div className="bg-white p-6 rounded-3xl shadow-sm h-72 border border-slate-100" style={{ minHeight: '300px' }}>
+                <div className="bg-white p-6 rounded-3xl shadow-sm h-72 border border-slate-100 print:h-64 print:col-span-1 print:border-black" style={{ minHeight: '300px' }}>
                    <h3 className="text-sm font-bold text-slate-800 mb-4">Évolution quotidienne</h3>
                    <ResponsiveContainer width="100%" height="90%"><BarChart data={dataBar}><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10}} /><Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '12px', border:'none'}} /><Bar dataKey="CA" fill="#6366f1" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
                 </div>
@@ -304,6 +316,7 @@ export default function SophieCaisse() {
             )}
           </div>
          ) : (
+          /* VUE TABLEAU */
           <div className="bg-white p-1 shadow-2xl rounded-2xl print:shadow-none print:p-0 overflow-visible">
             <table className="w-full border-collapse text-xs md:text-sm">
               <thead>
