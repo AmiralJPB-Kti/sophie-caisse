@@ -56,11 +56,11 @@ export default function SophieCaisse() {
   const [newPassword, setNewPassword] = useState("");
   const [msgProfile, setMsgProfile] = useState("");
 
-  // --- DATA LOADING ---
+  // --- DATALOADING ---
   const loadEntries = async () => {
     if (!session) return; setLoadingData(true);
-    // On charge TOUT l'historique pour être sûr d'avoir les données pour les exports annuels
-    const { data, error } = await supabase.from('caisse_sophie').select('*').order('date', { ascending: true });
+    // On demande explictement 10000 lignes pour être sûr d'avoir tout l'historique
+    const { data, error } = await supabase.from('caisse_sophie').select('*').order('date', { ascending: true }).limit(10000);
     if (error) console.error(error); else {
       setEntries((data || []).map((d: any) => ({ ...d, especes: parseFloat(d.especes)||0, cb: parseFloat(d.cb)||0, cheques: parseFloat(d.cheques)||0, depenses: parseFloat(d.depenses)||0 })));
     }
@@ -70,14 +70,14 @@ export default function SophieCaisse() {
 
   useEffect(() => {
     const existing = entries.find(e => e.date === format(selectedDate, 'yyyy-MM-dd'));
-    if (existing) { setFormData({ especes: existing.especes.toString(), cb: existing.cb.toString(), cheques: existing.cheques.toString(), depenses: existing.depenses.toString() }); setIsEditing(true); }
+    if (existing) { setFormData({ especes: existing.especes.toString(), cb: existing.cb.toString(), cheques: existing.cheques.toString(), depenses: existing.depenses.toString() }); setIsEditing(true); } 
     else { setFormData({ especes: '', cb: '', cheques: '', depenses: '' }); setIsEditing(false); }
   }, [selectedDate, entries]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault(); if (newPassword.length < 6) { setMsgProfile("Mini 6 caractères."); return; }
     setLoadingAuth(true); const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) setMsgProfile("Erreur: " + error.message); else { setMsgProfile("Succès !"); setTimeout(() => { setShowProfileModal(false); setMsgProfile(""); setNewPassword(""); }, 1500); }
+    if (error) setMsgProfile("Erreur: " + error.message); else { setMsgProfile("Succès !"); setTimeout(() => { setShowProfileModal(false); setMsgProfile(""); setNewPassword(""); }, 1500); } 
     setLoadingAuth(false);
   };
 
@@ -86,7 +86,7 @@ export default function SophieCaisse() {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const entryData = { date: dateStr, especes: parseFloat(formData.especes || '0'), cb: parseFloat(formData.cb || '0'), cheques: parseFloat(formData.cheques || '0'), depenses: parseFloat(formData.depenses || '0') };
     const { error } = await supabase.from('caisse_sophie').upsert(entryData, { onConflict: 'date' });
-    if (error) alert("Erreur : " + error.message); else { await loadEntries(); alert("Enregistré !"); }
+    if (error) alert("Erreur : " + error.message); else { await loadEntries(); alert("Enregistré !"); } 
   };
   const handleDelete = async (dateStr: string) => { if (!session || !confirm("Supprimer ?")) return; const { error } = await supabase.from('caisse_sophie').delete().eq('date', dateStr); if (error) alert("Erreur"); else await loadEntries(); };
   const clearField = (field: keyof typeof formData) => setFormData(prev => ({ ...prev, [field]: '' }));
@@ -133,7 +133,7 @@ export default function SophieCaisse() {
       dataToExport = monthEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       filename = `Caisse_Sophie_${format(selectedDate, 'MM-yyyy')}.csv`;
     } else {
-      // Export Année
+      // Export Année (Scan complet sur entries)
       const currentYear = format(selectedDate, 'yyyy');
       dataToExport = entries
         .filter(e => format(new Date(e.date), 'yyyy') === currentYear)
@@ -141,7 +141,7 @@ export default function SophieCaisse() {
       filename = `Caisse_Sophie_ANNEE_${currentYear}.csv`;
     }
 
-    if (dataToExport.length === 0) { alert("Aucune donnée pour cette période."); return; }
+    if (dataToExport.length === 0) { alert("Aucune donnée trouvée pour cette période."); return; }
 
     let csvContent = "\uFEFFDate;Espèces;CB;Chèques;Dépenses;Total Jour\n";
     dataToExport.forEach(e => {
@@ -163,12 +163,14 @@ export default function SophieCaisse() {
       filename = `Caisse_Sophie_${format(selectedDate, 'MM-yyyy')}.txt`;
     } else {
       const currentYear = format(selectedDate, 'yyyy');
-      dataToExport = entries.filter(e => format(new Date(e.date), 'yyyy') === currentYear).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      dataToExport = entries
+        .filter(e => format(new Date(e.date), 'yyyy') === currentYear)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       title = `ANNÉE COMPLÈTE : ${currentYear}`;
       filename = `Caisse_Sophie_ANNEE_${currentYear}.txt`;
     }
 
-    if (dataToExport.length === 0) { alert("Aucune donnée."); return; }
+    if (dataToExport.length === 0) { alert("Aucune donnée trouvée."); return; }
 
     let txtContent = `JOURNAL DE CAISSE - SOPHIE\n${title}\n\n`;
     txtContent += "DATE       | ESPÈCES  | CB       | CHÈQUES  | DÉPENSES | TOTAL\n";
@@ -189,12 +191,11 @@ export default function SophieCaisse() {
   };
 
   const handlePrint = () => {
-    // Si on est en mode formulaire, on bascule en mode tableau pour l'impression par défaut
     if (viewMode === 'form') setViewMode('table');
     setTimeout(() => {
       window.print();
       setShowExportMenu(false);
-    }, 300); // Petit délai pour laisser le rendu se faire
+    }, 300);
   };
 
   if (checkingSession) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><RefreshCw className="animate-spin text-indigo-600" /></div>;
@@ -226,15 +227,18 @@ export default function SophieCaisse() {
     <div className="min-h-screen bg-slate-50 pb-20 relative">
       <style jsx global>{`
         @media print {
-          @page { margin: 10mm; size: landscape; }
-          body { -webkit-print-color-adjust: exact; }
-          .print-scale-down { transform: scale(0.95); transform-origin: top center; }
+          @page { margin: 5mm; size: portrait; }
+          body { -webkit-print-color-adjust: exact; background: white; }
+          .print-scale-down { width: 100%; max-width: 100%; transform: scale(0.90); transform-origin: top center; }
+          .print-hidden { display: none !important; }
+          /* Masquer les boutons d'export et logout à l'impression */
+          button { display: none !important; }
         }
       `}</style>
 
       {/* MODAL PROFIL */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:hidden">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
             <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Mot de passe</h3><X className="cursor-pointer" onClick={() => setShowProfileModal(false)} /></div>
             <form onSubmit={handleChangePassword} className="space-y-4">
@@ -266,7 +270,7 @@ export default function SophieCaisse() {
                   <button onClick={() => handleExportTXT('year')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileText size={16} className="text-slate-700" /> TXT ({format(selectedDate, 'yyyy')})</button>
                   
                   <div className="h-px bg-slate-100 my-2"></div>
-                  <button onClick={handlePrint} className="w-full text-left px-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-3 font-bold text-sm justify-center shadow-md"><Printer size={18} /> Imprimer la page</button>
+                  <button onClick={handlePrint} className="w-full text-left px-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-3 font-bold text-sm justify-center shadow-md"><Printer size={18} /> Imprimer PDF</button>
                 </div>
               )}
             </div>
@@ -320,9 +324,9 @@ export default function SophieCaisse() {
                 <div key={f.id} className="relative">
                   <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">{f.label}</label>
                   <div className="relative">
-                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${f.color}`}>{<f.icon size={20} />}</div>
+                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${f.color}`}><f.icon size={20} /></div>
                     <input type="number" value={formData[f.id as keyof typeof formData]} onChange={(e) => setFormData({...formData, [f.id]: e.target.value})} onFocus={e => e.target.select()} className="w-full bg-slate-50 p-4 pl-12 rounded-2xl border-2 border-slate-100 outline-none focus:border-indigo-500 font-bold text-lg" placeholder="0.00" />
-                    {formData[f.id as keyof typeof formData] && <X className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 cursor-pointer" onClick={() => clearField(f.id as keyof typeof formData)} />} 
+                    {formData[f.id as keyof typeof formData] && <X className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 cursor-pointer" onClick={() => clearField(f.id as keyof typeof formData)} />}
                   </div>
                 </div>
               ))}
