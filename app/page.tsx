@@ -271,10 +271,22 @@ export default function SophieCaisse() {
     autoTable(doc, { 
         head: [['Jour', 'Espèces', 'CB', 'Chèques', 'Dépenses', 'Total']], 
         body: tableRows, 
-        startY: 30, 
+        startY: 25, // Remonté pour gagner de la place
         theme: 'grid', 
-        styles: { fontSize: 8, cellPadding: 2 }, // Compact
-        headStyles: { fillColor: [79, 70, 229] }
+        styles: { 
+            fontSize: 7.5, 
+            cellPadding: 1, // Interlignage très serré
+            minCellHeight: 4 // Hauteur de ligne minimale
+        }, 
+        headStyles: { fillColor: [79, 70, 229] },
+        columnStyles: {
+            0: { cellWidth: 25 },
+            1: { halign: 'right' },
+            2: { halign: 'right' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' }
+        }
     });
     
     doc.save(`Bilan_Caisse_${format(selectedDate, 'MM-yyyy')}.pdf`);
