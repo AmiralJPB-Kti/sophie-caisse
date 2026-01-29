@@ -5,7 +5,7 @@ import {
   Calendar, Banknote, CreditCard, Receipt, ShoppingBag, Save, Edit2,
   ChevronLeft, ChevronRight, Download, X, Table as TableIcon, LayoutGrid,
   Trash2, RefreshCw, Lock, User, LogOut, Mail, PieChart as PieChartIcon,
-  FileSpreadsheet, FileText, Printer, Eye, EyeOff, Trophy, TrendingUp, Medal
+  FileSpreadsheet, FileText, Printer, Eye, EyeOff, Trophy, TrendingUp, Medal, CalendarCheck
 } from 'lucide-react';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -358,37 +358,43 @@ export default function SophieCaisse() {
                   <button onClick={handleGeneratePDF} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-bold text-indigo-600 text-sm"><Printer size={16} /> PDF Tableau (A4)</button>
                   <div className="text-[10px] font-bold text-slate-400 uppercase px-3 pt-3 pb-2 border-t mt-2">Exporter l'Année</div>
                   <button onClick={() => handleExportCSV('year')} className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg flex items-center gap-3 font-medium text-sm"><FileSpreadsheet size={16} className="text-green-700" /> CSV ({format(selectedDate, 'yyyy')})</button>
-                  <div className="h-px bg-slate-100 my-2"></div>
-                  <button onClick={handlePrint} className="w-full text-left px-3 py-3 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-3 font-medium text-sm justify-center"><Printer size={18} /> Imprimer Page Web</button>
-                </div>
-              )}
-            </div>
-            <button onClick={handleLogout} className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100"><LogOut size={20} /></button>
-          </div>
-        </div>
-
-        <div className={`max-w-md mx-auto flex justify-between items-center mt-6 ${viewMode === 'form' ? 'hidden' : ''}`}> 
-          <button onClick={() => setSelectedDate(subDays(selectedDate, 30))}><ChevronLeft /></button>
-          <div className="text-center relative group cursor-pointer">
-            <div className="text-xs uppercase opacity-70 font-bold group-hover:opacity-100 transition">Mois de</div>
-            <div className="text-xl font-bold flex items-center justify-center gap-2">{format(selectedDate, 'MMMM yyyy', { locale: fr })} <Calendar size={16} className="opacity-50" /></div>
-            <input type="date" className="absolute inset-0 opacity-0 cursor-pointer" value={format(selectedDate, 'yyyy-MM-dd')} onChange={(e) => { if(e.target.valueAsDate) setSelectedDate(e.target.valueAsDate); }} />
-          </div>
-          <button onClick={() => setSelectedDate(addDays(selectedDate, 30))}><ChevronRight /></button>
-        </div>
-
-        {viewMode === 'form' && (
-          <div className="max-w-md mx-auto flex justify-between items-center mt-6">
-             <button onClick={() => setSelectedDate(subDays(selectedDate, 1))}><ChevronLeft /></button>
-             <div className="text-center relative group cursor-pointer">
-               <div className="text-xs uppercase opacity-70 font-bold">{format(selectedDate, 'EEEE', { locale: fr })}</div>
-               <div className="text-xl font-bold flex items-center justify-center gap-2">{format(selectedDate, 'd MMMM yyyy', { locale: fr })} <Calendar size={16} className="opacity-50" /></div>
-               <input type="date" className="absolute inset-0 opacity-0 cursor-pointer" value={format(selectedDate, 'yyyy-MM-dd')} onChange={(e) => { if(e.target.valueAsDate) setSelectedDate(e.target.valueAsDate); }} />
-             </div>
-             <button onClick={() => setSelectedDate(addDays(selectedDate, 1))}><ChevronRight /></button>
-          </div>
-        )}
-
+                                    <div className="h-px bg-slate-100 my-2"></div>
+                                    <button onClick={handlePrint} className="w-full text-left px-3 py-3 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-3 font-medium text-sm justify-center"><Printer size={18} /> Imprimer Page Web</button>
+                                    <button onClick={() => setShowExportMenu(false)} className="w-full text-center mt-2 text-xs text-slate-400 hover:text-slate-600 font-bold py-2">Fermer le menu</button>
+                                  </div>
+                                )}
+                              </div>
+                              <button onClick={handleLogout} className="bg-red-500/20 p-2 rounded-full hover:bg-red-500/40 transition text-red-100"><LogOut size={20} /></button>
+                            </div>
+                          </div>
+                  
+                          <div className={`max-w-md mx-auto flex justify-between items-center mt-6 ${viewMode === 'form' ? 'hidden' : ''}`}>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setSelectedDate(subDays(selectedDate, 30))} className="p-2 hover:bg-white/10 rounded-full transition"><ChevronLeft /></button>
+                              <button onClick={() => setSelectedDate(new Date())} className="p-2 hover:bg-white/10 rounded-full transition text-indigo-200 hover:text-white" title="Revenir à aujourd'hui"><CalendarCheck size={20} /></button>
+                            </div>
+                            <div className="text-center relative group cursor-pointer">
+                              <div className="text-xs uppercase opacity-70 font-bold group-hover:opacity-100 transition">Mois de</div>
+                              <div className="text-xl font-bold flex items-center justify-center gap-2">{format(selectedDate, 'MMMM yyyy', { locale: fr })} <Calendar size={16} className="opacity-50" /></div>
+                              <input type="date" className="absolute inset-0 opacity-0 cursor-pointer" value={format(selectedDate, 'yyyy-MM-dd')} onChange={(e) => { if(e.target.valueAsDate) setSelectedDate(e.target.valueAsDate); }} />
+                            </div>
+                            <button onClick={() => setSelectedDate(addDays(selectedDate, 30))} className="p-2 hover:bg-white/10 rounded-full transition"><ChevronRight /></button>
+                          </div>
+                  
+                          {viewMode === 'form' && (
+                            <div className="max-w-md mx-auto flex justify-between items-center mt-6">
+                               <div className="flex items-center gap-2">
+                                  <button onClick={() => setSelectedDate(subDays(selectedDate, 1))} className="p-2 hover:bg-white/10 rounded-full transition"><ChevronLeft /></button>
+                                  <button onClick={() => setSelectedDate(new Date())} className="p-2 hover:bg-white/10 rounded-full transition text-indigo-200 hover:text-white" title="Revenir à aujourd'hui"><CalendarCheck size={20} /></button>
+                               </div>
+                               <div className="text-center relative group cursor-pointer">
+                                 <div className="text-xs uppercase opacity-70 font-bold">{format(selectedDate, 'EEEE', { locale: fr })}</div>
+                                 <div className="text-xl font-bold flex items-center justify-center gap-2">{format(selectedDate, 'd MMMM yyyy', { locale: fr })} <Calendar size={16} className="opacity-50" /></div>
+                                 <input type="date" className="absolute inset-0 opacity-0 cursor-pointer" value={format(selectedDate, 'yyyy-MM-dd')} onChange={(e) => { if(e.target.valueAsDate) setSelectedDate(e.target.valueAsDate); }} />
+                               </div>
+                               <button onClick={() => setSelectedDate(addDays(selectedDate, 1))} className="p-2 hover:bg-white/10 rounded-full transition"><ChevronRight /></button>
+                            </div>
+                          )}
         <div className="max-w-xs mx-auto flex bg-indigo-800/50 p-1 rounded-xl mt-6">
           <button onClick={() => setViewMode('form')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${viewMode === 'form' ? 'bg-white text-indigo-600' : ''}`}><LayoutGrid size={16}/> Saisie</button>
           <button onClick={() => setViewMode('table')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${viewMode === 'table' ? 'bg-white text-indigo-600' : ''}`}><TableIcon size={16}/> Tableau</button>
