@@ -5,7 +5,7 @@ import {
   Calendar, Banknote, CreditCard, Receipt, ShoppingBag, Save, Edit2,
   ChevronLeft, ChevronRight, Download, X, Table as TableIcon, LayoutGrid,
   Trash2, RefreshCw, Lock, User, LogOut, Mail, PieChart as PieChartIcon,
-  FileSpreadsheet, FileText, Printer, Eye, EyeOff, Trophy, TrendingUp
+  FileSpreadsheet, FileText, Printer, Eye, EyeOff, Trophy, TrendingUp, Medal
 } from 'lucide-react';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -119,9 +119,9 @@ export default function SophieCaisse() {
     };
   }, [currentMonthData]);
 
-  // 3. Calcul "Meilleur Jour"
-  const bestDayInfo = useMemo(() => {
-    if (currentMonthData.length === 0) return null;
+  // 3. Calcul "Podium" (Top 3 des jours)
+  const podium = useMemo(() => {
+    if (currentMonthData.length === 0) return [];
     const daysCA: { [key: string]: { total: number, count: number } } = {};
     const dayNames = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
     
@@ -138,7 +138,8 @@ export default function SophieCaisse() {
         avg: daysCA[name].total / daysCA[name].count
     }));
 
-    return averages.sort((a, b) => b.avg - a.avg)[0];
+    // On retourne le Top 3 trié par moyenne décroissante
+    return averages.sort((a, b) => b.avg - a.avg).slice(0, 3);
   }, [currentMonthData]);
 
   // 4. Données Graphiques
@@ -442,14 +443,36 @@ export default function SophieCaisse() {
                     <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Moy/Jour</div><div className="text-2xl font-black text-indigo-600">{monthlyTotals.avgDay.toFixed(0)} €</div></div>
                 </div>
 
-                {bestDayInfo && (
-                    <div className="print:col-span-2 bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 rounded-3xl text-white shadow-lg flex items-center justify-between">
-                        <div>
-                            <div className="text-indigo-100 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2"><Trophy size={14}/> Performance</div>
-                            <div className="text-2xl font-bold">Le {bestDayInfo.name}</div>
-                            <div className="text-sm opacity-90 mt-1">est votre meilleur jour avec une moyenne de <span className="font-black text-white">{bestDayInfo.avg.toFixed(2)} €</span></div>
-                        </div>
-                        <TrendingUp size={48} className="text-white/20" />
+                {/* PODIUM : TOP 3 JOURS */}
+                {podium.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
+                        {/* 1er - OR */}
+                        {podium[0] && (
+                          <div className="bg-yellow-50 border-2 border-yellow-200 p-4 rounded-3xl flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 bg-yellow-400 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl">N°1</div>
+                            <Trophy size={32} className="text-yellow-500 mb-2" />
+                            <div className="text-yellow-900 font-bold text-lg">{podium[0].name}</div>
+                            <div className="text-yellow-600 text-sm font-medium">Moy. <span className="font-bold">{podium[0].avg.toFixed(0)} €</span></div>
+                          </div>
+                        )}
+                        {/* 2ème - ARGENT */}
+                        {podium[1] && (
+                          <div className="bg-slate-50 border-2 border-slate-200 p-4 rounded-3xl flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 bg-slate-400 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl">N°2</div>
+                            <Medal size={32} className="text-slate-400 mb-2" />
+                            <div className="text-slate-700 font-bold text-lg">{podium[1].name}</div>
+                            <div className="text-slate-500 text-sm font-medium">Moy. <span className="font-bold">{podium[1].avg.toFixed(0)} €</span></div>
+                          </div>
+                        )}
+                        {/* 3ème - BRONZE */}
+                        {podium[2] && (
+                          <div className="bg-orange-50 border-2 border-orange-200 p-4 rounded-3xl flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 bg-orange-400 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl">N°3</div>
+                            <Medal size={32} className="text-orange-500 mb-2" />
+                            <div className="text-orange-800 font-bold text-lg">{podium[2].name}</div>
+                            <div className="text-orange-600 text-sm font-medium">Moy. <span className="font-bold">{podium[2].avg.toFixed(0)} €</span></div>
+                          </div>
+                        )}
                     </div>
                 )}
 
