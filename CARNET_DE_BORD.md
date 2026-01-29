@@ -1,30 +1,20 @@
-### 📅 Mardi 27 Janvier 2026 (Lancement & V1.5 - Version Finale)
-**État :** ✅ Mise en production
-**Résumé :** Web App SaaS complète pour la gestion de caisse, sécurisée, performante et orientée décisionnel.
+### 📅 Mardi 27 Janvier 2026 (Fin de Session - V1.6)
+**État :** ✅ Stable & Optimisé
+**Résumé :** Polissage final de l'expérience utilisateur (UX) et des outils d'administration.
 
-#### 1. Interface & UX (Frontend)
-- **Design :** Interface épurée, responsive (Mobile/Desktop), icônes colorées Lucide.
-- **Saisie Rapide :** Gros boutons tactiles, calculs automatiques du total journalier.
-- **Tableau Comptable :** Vue pleine largeur, totaux hebdomadaires automatiques, mise en page optimisée pour l'impression A4 (Portrait).
-- **Navigation :** Sélecteur de date natif (cliquable) pour sauter rapidement dans le temps.
+#### 1. Ergonomie & UX (Finitions)
+- **Navigation Temporelle :** Ajout d'un bouton **"Revenir à aujourd'hui"** (Calendrier coché) pour quitter les archives instantanément.
+- **Sécurité Visuelle :** Ajout d'un bouton **"Œil"** (Afficher/Masquer) sur tous les champs de mot de passe (Login & Profil).
+- **Menu Export :** Ajout d'un bouton de fermeture explicite pour éviter les clics perdus.
 
-#### 2. Décisionnel & Statistiques (Bilan)
-- **KPIs Temps Réel :** Chiffre d'Affaires, Dépenses, Panier Moyen Journalier.
-- **Graphiques Animés :** Répartition des paiements (Donut) et Évolution temporelle (Barres).
-- **Podium Performance :** Analyse automatique des 3 meilleurs jours de la semaine (Or/Argent/Bronze) avec moyennes calculées.
+#### 2. Statistiques & Décisionnel
+- **Podium Performance :** Remplacement de la stat unique par un **Top 3 (Or/Argent/Bronze)** des meilleurs jours de la semaine.
+- **Optimisation Moteur :** Utilisation de `useMemo` pour éviter les recalculs inutiles lors de la navigation (fluidité maximale).
 
-#### 3. Gestion des Données (Backend & Export)
-- **Base de données :** Supabase (PostgreSQL) avec typage strict.
-- **Exports Professionnels :**
-    - **PDF :** Génération vectorielle propre (`jsPDF`) pour archivage comptable.
-    - **CSV/TXT :** Exports filtrables (Mois ou Année complète) compatibles Excel/EBP.
-- **Performance :** Optimisation React (`useMemo`) pour une fluidité parfaite même avec 10 000 entrées.
-
-#### 4. Sécurité & Administration
-- **Authentification :** Système Email/Mot de passe sécurisé (Supabase Auth).
-- **Contrôle d'Accès :** Whitelist (Liste d'invités) bloquant tout email non autorisé au niveau de la base de données (RLS).
-- **Autonomie :** Module "Profil" pour changer son mot de passe soi-même.
-- **Confidentialité :** Champs de mot de passe masqués avec bouton "Œil" pour vérifier la saisie.
+#### 3. Administration & Tests
+- **Simulateur de Données :** Création du script `simulateur_donnees.py` pour générer une année 2025 réaliste (saisonnalité, jours fermés).
+- **Maintenance SQL :** Création du script `NETTOYAGE_2025.txt` pour purger les données de test sans affecter la production 2026.
+- **Correction Export :** Le PDF s'imprime désormais parfaitement sur une seule page A4 (Portrait) grâce à un ajustement fin des marges et de la police.
 
 ---
 
