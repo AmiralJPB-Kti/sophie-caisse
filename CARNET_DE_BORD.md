@@ -1,62 +1,48 @@
-### 📅 Mardi 27 Janvier 2026 (Lancement & V1.3)
+### 📅 Mardi 27 Janvier 2026 (Lancement & V1.5 - Version Finale)
 **État :** ✅ Mise en production
-**Résumé :** Finalisation de la Web App sécurisée (SaaS) avec Statistiques avancées et Exports.
+**Résumé :** Web App SaaS complète pour la gestion de caisse, sécurisée, performante et orientée décisionnel.
 
 #### 1. Interface & UX (Frontend)
-- Initialisation projet **Next.js 15** + **Tailwind CSS**.
-- Création d'une **Vue "Saisie Rapide"** (Gros boutons, UX mobile) pour l'usage quotidien.
-- Création d'une **Vue "Tableur Comptable"** (Style Excel, Lignes hebdos, Totaux) pour rassurer et imprimer.
-- **Tableau de Bord (Bilan)** avec graphiques animés (Recharts) : Répartition et Évolution.
-- **Sélecteur de Date Natif :** Navigation rapide dans le calendrier (clic sur le mois).
-- **Menu Export Avancé :** 
-    - CSV (Excel) filtré par mois.
-    - TXT (Texte aligné) pour archivage simple.
-    - PDF (Impression optimisée) pour les stats et le tableau.
+- **Design :** Interface épurée, responsive (Mobile/Desktop), icônes colorées Lucide.
+- **Saisie Rapide :** Gros boutons tactiles, calculs automatiques du total journalier.
+- **Tableau Comptable :** Vue pleine largeur, totaux hebdomadaires automatiques, mise en page optimisée pour l'impression A4 (Portrait).
+- **Navigation :** Sélecteur de date natif (cliquable) pour sauter rapidement dans le temps.
 
-#### 2. Données & Persistance (Backend)
-- Migration du stockage local (localStorage) vers **Supabase** (PostgreSQL).
-- Création de la table `caisse_sophie` avec colonnes typées (Decimal, Date).
-- Mise en place d'une synchronisation Cloud en temps réel.
+#### 2. Décisionnel & Statistiques (Bilan)
+- **KPIs Temps Réel :** Chiffre d'Affaires, Dépenses, Panier Moyen Journalier.
+- **Graphiques Animés :** Répartition des paiements (Donut) et Évolution temporelle (Barres).
+- **Podium Performance :** Analyse automatique des 3 meilleurs jours de la semaine (Or/Argent/Bronze) avec moyennes calculées.
 
-#### 3. Sécurité & Éthique (Auth)
-- Mise en place de **Supabase Auth** (Email/Password).
-- Création d'une **Whitelist (Liste d'invités)** via la table `sophie_autorisations`.
-- Sécurité **RLS (Row Level Security)** stricte : accès réservé aux emails autorisés.
-- Ajout d'une modale **"Profil"** permettant à l'utilisateur de changer son mot de passe en autonomie.
+#### 3. Gestion des Données (Backend & Export)
+- **Base de données :** Supabase (PostgreSQL) avec typage strict.
+- **Exports Professionnels :**
+    - **PDF :** Génération vectorielle propre (`jsPDF`) pour archivage comptable.
+    - **CSV/TXT :** Exports filtrables (Mois ou Année complète) compatibles Excel/EBP.
+- **Performance :** Optimisation React (`useMemo`) pour une fluidité parfaite même avec 10 000 entrées.
 
-#### 4. Déploiement (DevOps)
-- Hébergement sur **Vercel** (HTTPS/SSL automatique).
-- Gestion des variables d'environnement sécurisées.
-- Correction des bugs de build liés à la version de Next.js (Fix 15.1.12).
+#### 4. Sécurité & Administration
+- **Authentification :** Système Email/Mot de passe sécurisé (Supabase Auth).
+- **Contrôle d'Accès :** Whitelist (Liste d'invités) bloquant tout email non autorisé au niveau de la base de données (RLS).
+- **Autonomie :** Module "Profil" pour changer son mot de passe soi-même.
+- **Confidentialité :** Champs de mot de passe masqués avec bouton "Œil" pour vérifier la saisie.
 
 ---
 
-## 🚀 LABORATOIRE D'IDÉES & ÉVOLUTIONS (Roadmap)
+## 🚀 PISTES POUR LA SUITE (V2)
 
-### 🎯 Court Terme (Pour Sophie)
-- [x] **Tableau de Bord (Dashboard) :** Terminé (V1.2).
-- [x] **Export Comptable :** Terminé (V1.3 - CSV/TXT).
-- [ ] **Gestion des Dépenses :** Photos des tickets de caisse (Stockage Supabase Storage).
-- [ ] **Mode Hors Ligne (PWA) :** Permettre la saisie même sans internet (Sync au retour).
+### 🌍 Adaptation Métiers
+- **Coiffure/Beauté :** Fichier client simplifié, Rappel RDV SMS.
+- **Boulangerie :** Module "Commandes du lendemain".
+- **BTP :** Suivi de chantier et devis PDF rapide.
 
-### 🌍 Moyen Terme (Adaptation autres TPE/Artisans)
-*Idées pour dupliquer ce projet vers d'autres secteurs.*
-
-#### Pour un Boulanger / Snack :
-- [ ] **Module "Commandes" :** Saisir les commandes du lendemain.
-- [ ] **Anti-Gaspillage :** Saisie des invendus.
-
-#### Pour un Coiffeur / Esthéticienne :
-- [ ] **Fichier Clients Simplifié :** Historique des prestations.
-- [ ] **Rappel RDV :** SMS automatiques.
-
-#### Pour un Artisan BTP :
-- [ ] **Suivi de Chantier :** Heures et matériel.
-- [ ] **Devis Rapide :** Générateur PDF sur mobile.
+### 🛠️ Technique
+- **Mode Hors Ligne (PWA) :** Permettre la saisie sans réseau (synchronisation différée).
+- **Multi-Boutiques :** Gérer plusieurs points de vente avec un seul compte Admin.
+- **Scan Ticket :** Reconnaissance optique (OCR) des tickets de dépenses.
 
 ---
 
-## 📝 NOTES TECHNIQUES & RAPPELS
-- **Base de données :** Supabase (Table `caisse_sophie` + `sophie_autorisations`).
-- **Sécurité :** Ne jamais donner d'accès sans ajouter l'email dans la table `sophie_autorisations`.
-- **Exports :** Le CSV utilise le séparateur point-virgule (;) et l'encodage UTF-8 BOM pour compatibilité Excel Windows.
+## 📝 NOTES TECHNIQUES
+- **Stack :** Next.js 15, Tailwind CSS, Supabase, Recharts, jsPDF.
+- **Hébergement :** Vercel (Frontend) + Supabase (Backend).
+- **Sécurité :** Les mots de passe ne sont jamais stockés en clair. L'accès aux données est verrouillé par des politiques RLS strictes.
